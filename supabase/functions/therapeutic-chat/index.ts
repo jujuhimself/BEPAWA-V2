@@ -222,6 +222,166 @@ async function analyzeEmotionalState(message: string, context: any): Promise<str
   return context?.emotional_state || 'neutral';
 }
 
+async function generateDynamicSuggestions(params: {
+  message: string;
+  language: string;
+  emotionalState: string;
+  sessionCount: number;
+  topics: string[];
+  usedKnowledge: boolean;
+}): Promise<string[]> {
+  const { message, language, emotionalState, sessionCount, topics, usedKnowledge } = params;
+  const groqApiKey = Deno.env.get('GROQ_API_KEY');
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+
+  // Occasionally suppress suggestions to feel more conversational
+  const roll = Math.random();
+  if (roll < 0.3) {
+    return [];
+  }
+
+  const baseSystem = language === 'sw'
+    ? `Wewe ni Bepawaa Care 💚.
+Unaandika chaguo fupi za menyu ya WhatsApp (0-3 tu) kwa usaidizi wa afya ya akili.
+LENGO: pendekeza vitufe vinavyosaidia kuliko kuzungumza moja kwa moja.
+
+MAELEKEZO MUHIMU:
+- Tumia KISWAHILI SANIFU, sentensi fupi sana.
+- Rudisha tu vitu vya menyu, sio maelezo marefu.
+- Zingatia hali ya kihisia, mada, hatua ya mazungumzo na idadi ya vikao.
+- Aina za menyu zinazowezekana: "emotional_checkin", "actions", "resources", "navigation".
+- Ruhusu pia "none" kama hakuna vitufe vinavyofaa kwa sasa.
+`
+    : `You are Bepawaa Care 💚.
+You design very short WhatsApp quick-reply buttons (0-3 max) for a mental health chat.
+GOAL: suggest helpful next steps, not continue the conversation yourself.
+
+KEY RULES:
+- Use simple, supportive English.
+- Return only menu-style options, no long explanations.
+- Consider emotion, topic, conversation stage, and session count.
+- Possible suggestion_type values: "emotional_checkin", "actions", "resources", "navigation", or "none".
+`;
+
+  const convoStage = sessionCount <= 2 ? 'greeting' : sessionCount <= 6 ? 'middle' : 'action';
+  const topicHint = topics.slice(-3).join(', ') || 'general mental health';
+
+  const systemPrompt = `${baseSystem}\n\nContext summary: emotion=${emotionalState}; stage=${convoStage}; topics=${topicHint}; used_knowledge=${usedKnowledge}`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    {
+      role: 'user',
+      content:
+        language === 'sw'
+          ? `Huu ndio ujumbe wa mtumiaji: "${message}"
+Tafadhali chagua kati ya 0 na 3 mapendekezo ya vitufe vya haraka kwa hatua inayofuata.
+Rudisha majibu kwa JSON pekee, bila maelezo mengine.`
+          : `Here is the user's latest message: "${message}".
+Please propose between 0 and 3 WhatsApp quick-reply options for the next step.
+Respond with JSON only, no extra text.`
+    }
+  ];
+
+  const body: any = {
+    model: 'llama-3.1-8b-instant',
+    messages,
+    max_tokens: 200,
+    temperature: 0.7,
+    tools: [
+      {
+        type: 'function',
+        function: {
+          name: 'respond_with_suggestions',
+          description: 'Choose contextual WhatsApp quick replies for the therapeutic chatbot.',
+          parameters: {
+            type: 'object',
+            properties: {
+              suggestion_type: {
+                type: 'string',
+                enum: ['none', 'emotional_checkin', 'actions', 'resources', 'navigation']
+              },
+              suggestions: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string' }
+                  },
+                  required: ['label'],
+                  additionalProperties: false
+                }
+              }
+            },
+            required: ['suggestion_type', 'suggestions'],
+            additionalProperties: false
+          }
+        }
+      }
+    ],
+    tool_choice: { type: 'function', function: { name: 'respond_with_suggestions' } }
+  };
+
+  async function callProvider(url: string, apiKey: string, isLovable = false) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ...(isLovable ? { model: 'google/gemini-2.5-flash' } : {}),
+        ...body,
+        stream: false
+      })
+    });
+    if (!res.ok) throw new Error(`Suggestion provider error: ${res.status}`);
+    const json = await res.json();
+    const toolCall = json.choices?.[0]?.message?.tool_calls?.[0];
+    const argsRaw = toolCall?.function?.arguments;
+    if (!argsRaw) return [];
+
+    try {
+      const parsed = typeof argsRaw === 'string' ? JSON.parse(argsRaw) : argsRaw;
+      if (parsed.suggestion_type === 'none') return [];
+      const rawList = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+      const labels = rawList
+        .map((s: any) => (s && typeof s.label === 'string' ? s.label.trim() : ''))
+        .filter(Boolean)
+        .slice(0, 3);
+      return labels;
+    } catch (err) {
+      console.warn('Suggestion parse error:', err);
+      return [];
+    }
+  }
+
+  try {
+    if (groqApiKey) {
+      return await callProvider('https://api.groq.com/openai/v1/chat/completions', groqApiKey);
+    }
+    if (lovableApiKey) {
+      return await callProvider('https://ai.gateway.lovable.dev/v1/chat/completions', lovableApiKey, true);
+    }
+  } catch (err) {
+    console.warn('Dynamic suggestions error:', err);
+  }
+
+  // Fallback heuristic suggestions
+  if (language === 'sw') {
+    if (emotionalState === 'sad' || emotionalState === 'anxious') {
+      return ['Nifundishe mbinu za kupumua 💨', 'Nisaidie kupanga hatua ndogo 💪'];
+    }
+    return ['Nieleze zaidi 💬', 'Mbinu za kukabiliana 💪'];
+  }
+
+  if (emotionalState === 'sad' || emotionalState === 'anxious') {
+    return ['Breathing exercise 💨', 'Small next step plan 💪'];
+  }
+
+  return ['Tell me more 💬', 'Coping strategies 💪'];
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -363,16 +523,23 @@ serve(async (req: Request) => {
         .eq('id', conversationId)
     ]);
 
-    // Generate contextual suggestions
-    const suggestions = language === 'sw' ? [
+    // Generate AI-powered contextual suggestions (0-3, sometimes none)
+    const dynamicSuggestions = await generateDynamicSuggestions({
+      message,
+      language,
+      emotionalState: newEmotionalState,
+      sessionCount: updatedContext.session_count,
+      topics: updatedContext.topics_discussed,
+      usedKnowledge
+    });
+
+    const suggestions = dynamicSuggestions.length > 0 ? dynamicSuggestions : (language === 'sw' ? [
       'Nieleze zaidi 💬',
-      'Mbinu za kukabiliana 💪',
-      'Zungumza na mshauri 🤝'
+      'Mbinu za kukabiliana 💪'
     ] : [
       'Tell me more 💬',
-      'Coping strategies 💪', 
-      'Talk to a counselor 🤝'
-    ];
+      'Coping strategies 💪'
+    ]);
 
     return new Response(JSON.stringify({
       content: response,
