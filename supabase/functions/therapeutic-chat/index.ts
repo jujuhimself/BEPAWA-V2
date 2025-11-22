@@ -533,13 +533,8 @@ serve(async (req: Request) => {
       usedKnowledge
     });
 
-    const suggestions = dynamicSuggestions.length > 0 ? dynamicSuggestions : (language === 'sw' ? [
-      'Nieleze zaidi 💬',
-      'Mbinu za kukabiliana 💪'
-    ] : [
-      'Tell me more 💬',
-      'Coping strategies 💪'
-    ]);
+    // Use AI-driven suggestions as-is; if none are returned, omit buttons entirely
+    const suggestions = dynamicSuggestions ?? [];
 
     return new Response(JSON.stringify({
       content: response,
