@@ -9,7 +9,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'individual' | 'retail' | 'wholesale' | 'lab';
+  role: 'admin' | 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery';
   // Common fields
   phone?: string;
   address?: string;
@@ -75,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'retail': return '/pharmacy';
       case 'wholesale': return '/wholesale';
       case 'lab': return '/lab';
+      case 'delivery': return '/delivery';
       default: return '/';
     }
   };
