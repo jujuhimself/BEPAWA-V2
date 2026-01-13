@@ -66,7 +66,7 @@ interface LabResult {
 
 interface Appointment {
   id: string;
-  test_type: string;
+  service_type: string;
   appointment_date: string;
   appointment_time: string;
   status: string;
@@ -92,43 +92,32 @@ const PatientManagement = () => {
 
   const fetchPatientData = async (patientId: string) => {
     try {
-      // Fetch patient profile
-      const { data: profile } = await supabase
-        .from('patient_profiles')
-        .select('*')
-        .eq('user_id', patientId)
-        .single();
-
-      if (profile) {
-        setPatientProfile(profile);
-      } else {
-        // Create default profile if none exists
-        const defaultProfile: PatientProfile = {
-          id: Date.now().toString(),
-          user_id: patientId,
-          full_name: selectedPatient?.full_name || selectedPatient?.email || "",
-          email: selectedPatient?.email || "",
-          phone: selectedPatient?.phone || "",
-          date_of_birth: "",
-          gender: "other",
-          emergency_contact: {
-            name: "",
-            relationship: "",
-            phone: ""
-          },
-          insurance: {
-            provider: "",
-            policy_number: "",
-            group_number: ""
-          },
-          allergies: [],
-          medications: [],
-          medical_history: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setPatientProfile(defaultProfile);
-      }
+      // Create default profile from selected patient (no patient_profiles table)
+      const defaultProfile: PatientProfile = {
+        id: patientId,
+        user_id: patientId,
+        full_name: selectedPatient?.full_name || selectedPatient?.email || "",
+        email: selectedPatient?.email || "",
+        phone: selectedPatient?.phone || "",
+        date_of_birth: "",
+        gender: "other",
+        emergency_contact: {
+          name: "",
+          relationship: "",
+          phone: ""
+        },
+        insurance: {
+          provider: "",
+          policy_number: "",
+          group_number: ""
+        },
+        allergies: [],
+        medications: [],
+        medical_history: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      setPatientProfile(defaultProfile);
 
       // Fetch lab results
       const { data: results } = await supabase
@@ -137,7 +126,14 @@ const PatientManagement = () => {
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false });
 
-      setLabResults(results || []);
+      const mappedResults: LabResult[] = (results || []).map((r: any) => ({
+        id: r.id,
+        test_type: r.test_type || 'Unknown',
+        result_data: r.result_data,
+        status: r.status || 'pending',
+        created_at: r.created_at
+      }));
+      setLabResults(mappedResults);
 
       // Fetch appointments
       const { data: apts } = await supabase
@@ -146,7 +142,15 @@ const PatientManagement = () => {
         .eq('user_id', patientId)
         .order('appointment_date', { ascending: false });
 
-      setAppointments(apts || []);
+      const mappedAppointments: Appointment[] = (apts || []).map((a: any) => ({
+        id: a.id,
+        service_type: a.service_type,
+        appointment_date: a.appointment_date,
+        appointment_time: a.appointment_time,
+        status: a.status,
+        created_at: a.created_at
+      }));
+      setAppointments(mappedAppointments);
 
     } catch (error) {
       console.error("Error fetching patient data:", error);
@@ -161,32 +165,15 @@ const PatientManagement = () => {
   const handleUpdateProfile = async () => {
     if (!patientProfile) return;
 
-    try {
-      const { error } = await supabase
-        .from('patient_profiles')
-        .upsert({
-          ...patientProfile,
-          ...formData,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) throw error;
-
-      setPatientProfile(prev => prev ? { ...prev, ...formData } : null);
-      setShowEditProfile(false);
-      setFormData({});
-      
-      toast({
-        title: "Profile Updated",
-        description: "Patient profile has been updated successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update patient profile",
-        variant: "destructive",
-      });
-    }
+    // Since there's no patient_profiles table, just update local state
+    setPatientProfile(prev => prev ? { ...prev, ...formData } : null);
+    setShowEditProfile(false);
+    setFormData({});
+    
+    toast({
+      title: "Profile Updated",
+      description: "Patient profile has been updated locally.",
+    });
   };
 
   const handleAddAllergy = () => {
@@ -234,14 +221,14 @@ const PatientManagement = () => {
   };
 
   const getStatusColor = (status: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       scheduled: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
       cancelled: 'bg-red-100 text-red-800',
       draft: 'bg-gray-100 text-gray-800',
       approved: 'bg-green-100 text-green-800'
     };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const calculateAge = (dateOfBirth: string) => {
@@ -340,7 +327,7 @@ const PatientManagement = () => {
                 <div>
                   <Label className="text-gray-500">Emergency Contact</Label>
                   <div className="mt-1 p-2 bg-red-50 rounded">
-                    <p className="font-medium">{patientProfile.emergency_contact.name}</p>
+                    <p className="font-medium">{patientProfile.emergency_contact.name || 'Not specified'}</p>
                     <p className="text-sm text-gray-600">{patientProfile.emergency_contact.relationship}</p>
                     <p className="text-sm text-gray-600">{patientProfile.emergency_contact.phone}</p>
                   </div>
@@ -349,8 +336,8 @@ const PatientManagement = () => {
                 <div>
                   <Label className="text-gray-500">Insurance</Label>
                   <div className="mt-1 p-2 bg-blue-50 rounded">
-                    <p className="font-medium">{patientProfile.insurance.provider}</p>
-                    <p className="text-sm text-gray-600">Policy: {patientProfile.insurance.policy_number}</p>
+                    <p className="font-medium">{patientProfile.insurance.provider || 'Not specified'}</p>
+                    <p className="text-sm text-gray-600">Policy: {patientProfile.insurance.policy_number || 'N/A'}</p>
                     {patientProfile.insurance.group_number && (
                       <p className="text-sm text-gray-600">Group: {patientProfile.insurance.group_number}</p>
                     )}
@@ -476,6 +463,9 @@ const PatientManagement = () => {
                         </p>
                       </div>
                     ))}
+                    {labResults.length === 0 && (
+                      <p className="text-sm text-gray-500">No lab results</p>
+                    )}
                   </div>
                 </div>
 
@@ -485,7 +475,7 @@ const PatientManagement = () => {
                     {appointments.slice(0, 3).map((appointment) => (
                       <div key={appointment.id} className="p-2 bg-gray-50 rounded">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">{appointment.test_type}</span>
+                          <span className="text-sm font-medium">{appointment.service_type}</span>
                           <Badge className={getStatusColor(appointment.status)}>
                             {appointment.status}
                           </Badge>
@@ -495,6 +485,9 @@ const PatientManagement = () => {
                         </p>
                       </div>
                     ))}
+                    {appointments.length === 0 && (
+                      <p className="text-sm text-gray-500">No appointments</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -509,195 +502,72 @@ const PatientManagement = () => {
           <DialogHeader>
             <DialogTitle>Edit Patient Profile</DialogTitle>
           </DialogHeader>
-          
-          {patientProfile && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input
-                    value={formData.full_name || patientProfile.full_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    value={formData.email || patientProfile.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input
-                    value={formData.phone || patientProfile.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Date of Birth</Label>
-                  <Input
-                    type="date"
-                    value={formData.date_of_birth || patientProfile.date_of_birth}
-                    onChange={(e) => setFormData(prev => ({ ...prev, date_of_birth: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Gender</Label>
-                  <Select 
-                    value={formData.gender || patientProfile.gender} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Blood Type</Label>
-                  <Select 
-                    value={formData.blood_type || patientProfile.blood_type || "unknown"} 
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, blood_type: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select blood type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">Unknown</SelectItem>
-                      <SelectItem value="A+">A+</SelectItem>
-                      <SelectItem value="A-">A-</SelectItem>
-                      <SelectItem value="B+">B+</SelectItem>
-                      <SelectItem value="B-">B-</SelectItem>
-                      <SelectItem value="AB+">AB+</SelectItem>
-                      <SelectItem value="AB-">AB-</SelectItem>
-                      <SelectItem value="O+">O+</SelectItem>
-                      <SelectItem value="O-">O-</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Height (cm)</Label>
-                  <Input
-                    type="number"
-                    value={formData.height || patientProfile.height || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, height: parseFloat(e.target.value) }))}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Weight (kg)</Label>
-                  <Input
-                    type="number"
-                    value={formData.weight || patientProfile.weight || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, weight: parseFloat(e.target.value) }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Emergency Contact</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <Input
-                    placeholder="Name"
-                    value={formData.emergency_contact?.name || patientProfile.emergency_contact.name}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      emergency_contact: { 
-                        ...prev.emergency_contact, 
-                        name: e.target.value 
-                      } 
-                    }))}
-                  />
-                  <Input
-                    placeholder="Relationship"
-                    value={formData.emergency_contact?.relationship || patientProfile.emergency_contact.relationship}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      emergency_contact: { 
-                        ...prev.emergency_contact, 
-                        relationship: e.target.value 
-                      } 
-                    }))}
-                  />
-                  <Input
-                    placeholder="Phone"
-                    value={formData.emergency_contact?.phone || patientProfile.emergency_contact.phone}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      emergency_contact: { 
-                        ...prev.emergency_contact, 
-                        phone: e.target.value 
-                      } 
-                    }))}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label>Insurance Information</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  <Input
-                    placeholder="Provider"
-                    value={formData.insurance?.provider || patientProfile.insurance.provider}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      insurance: { 
-                        ...prev.insurance, 
-                        provider: e.target.value 
-                      } 
-                    }))}
-                  />
-                  <Input
-                    placeholder="Policy Number"
-                    value={formData.insurance?.policy_number || patientProfile.insurance.policy_number}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      insurance: { 
-                        ...prev.insurance, 
-                        policy_number: e.target.value 
-                      } 
-                    }))}
-                  />
-                  <Input
-                    placeholder="Group Number"
-                    value={formData.insurance?.group_number || patientProfile.insurance.group_number}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      insurance: { 
-                        ...prev.insurance, 
-                        group_number: e.target.value 
-                      } 
-                    }))}
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div>
+              <Label>Full Name</Label>
+              <Input
+                value={formData.full_name || patientProfile?.full_name || ''}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+              />
             </div>
-          )}
-
+            <div>
+              <Label>Phone</Label>
+              <Input
+                value={formData.phone || patientProfile?.phone || ''}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Date of Birth</Label>
+              <Input
+                type="date"
+                value={formData.date_of_birth || patientProfile?.date_of_birth || ''}
+                onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Gender</Label>
+              <Select
+                value={formData.gender || patientProfile?.gender || 'other'}
+                onValueChange={(value) => setFormData({ ...formData, gender: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Blood Type</Label>
+              <Input
+                value={formData.blood_type || patientProfile?.blood_type || ''}
+                onChange={(e) => setFormData({ ...formData, blood_type: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Height (cm)</Label>
+              <Input
+                type="number"
+                value={formData.height || patientProfile?.height || ''}
+                onChange={(e) => setFormData({ ...formData, height: Number(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label>Weight (kg)</Label>
+              <Input
+                type="number"
+                value={formData.weight || patientProfile?.weight || ''}
+                onChange={(e) => setFormData({ ...formData, weight: Number(e.target.value) })}
+              />
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditProfile(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateProfile}>
-              Update Profile
-            </Button>
+            <Button variant="outline" onClick={() => setShowEditProfile(false)}>Cancel</Button>
+            <Button onClick={handleUpdateProfile}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -708,25 +578,17 @@ const PatientManagement = () => {
           <DialogHeader>
             <DialogTitle>Add Allergy</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Allergy</Label>
-              <Input
-                value={formData.allergy || ""}
-                onChange={(e) => setFormData(prev => ({ ...prev, allergy: e.target.value }))}
-                placeholder="Enter allergy"
-              />
-            </div>
+          <div className="py-4">
+            <Label>Allergy</Label>
+            <Input
+              value={formData.allergy || ''}
+              onChange={(e) => setFormData({ ...formData, allergy: e.target.value })}
+              placeholder="Enter allergy name"
+            />
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddAllergy(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddAllergy}>
-              Add Allergy
-            </Button>
+            <Button variant="outline" onClick={() => setShowAddAllergy(false)}>Cancel</Button>
+            <Button onClick={handleAddAllergy}>Add</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -737,25 +599,17 @@ const PatientManagement = () => {
           <DialogHeader>
             <DialogTitle>Add Medication</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Medication</Label>
-              <Input
-                value={formData.medication || ""}
-                onChange={(e) => setFormData(prev => ({ ...prev, medication: e.target.value }))}
-                placeholder="Enter medication"
-              />
-            </div>
+          <div className="py-4">
+            <Label>Medication</Label>
+            <Input
+              value={formData.medication || ''}
+              onChange={(e) => setFormData({ ...formData, medication: e.target.value })}
+              placeholder="Enter medication name"
+            />
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMedication(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddMedication}>
-              Add Medication
-            </Button>
+            <Button variant="outline" onClick={() => setShowAddMedication(false)}>Cancel</Button>
+            <Button onClick={handleAddMedication}>Add</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -763,4 +617,4 @@ const PatientManagement = () => {
   );
 };
 
-export default PatientManagement; 
+export default PatientManagement;

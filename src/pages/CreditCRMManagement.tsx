@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 
 interface CreditAccount {
   id: string;
-  customer_id: string;
   credit_limit: number;
   available_credit: number;
   current_balance: number;
@@ -19,6 +18,7 @@ interface CreditAccount {
   created_at: string;
   customer_name?: string;
   customer_contact?: string;
+  user_id: string;
 }
 
 interface CreditTransaction {
@@ -64,26 +64,21 @@ const CreditCRMManagement: React.FC = () => {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      // Fetch customer details
-      const accountsWithCustomers = await Promise.all(
-        (data || []).map(async (account) => {
-          let customer = null;
-          if (account.customer_id) {
-            const { data: customerData } = await supabase
-              .from('profiles')
-              .select('name, email, phone')
-              .eq('id', account.customer_id)
-              .single();
-            customer = customerData;
-          }
-          return {
-            ...account,
-            customer_name: customer?.name || account.customer_name || 'Unknown',
-            customer_contact: customer?.phone || customer?.email || account.contact_info || '',
-          };
-        })
-      );
-      setAccounts(accountsWithCustomers);
+      
+      // Map data to match our interface
+      const mappedAccounts: CreditAccount[] = (data || []).map((account: any) => ({
+        id: account.id,
+        credit_limit: account.credit_limit,
+        available_credit: account.available_credit,
+        current_balance: account.current_balance,
+        status: account.status,
+        created_at: account.created_at,
+        user_id: account.user_id,
+        customer_name: account.customer_name || 'Unknown',
+        customer_contact: account.contact_info || '',
+      }));
+      
+      setAccounts(mappedAccounts);
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to fetch credit accounts', variant: 'destructive' });
     }
@@ -103,27 +98,20 @@ const CreditCRMManagement: React.FC = () => {
   };
 
   const fetchTransactions = async (accountId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('credit_account_id', accountId)
-        .order('transaction_date', { ascending: false });
-      if (error) throw error;
-      setTransactions(data || []);
-    } catch (error: any) {
-      console.error('Error fetching transactions:', error);
-    }
+    // Since credit_transactions table doesn't exist, we'll use empty array
+    setTransactions([]);
   };
 
   const createCreditAccount = async () => {
     if (!user) return;
     try {
+      const selectedCustomer = customers.find(c => c.id === accountForm.customer_id);
       const { error } = await supabase
         .from('credit_accounts')
         .insert({
           user_id: user.id,
-          customer_id: accountForm.customer_id,
+          customer_name: selectedCustomer?.name || 'Unknown',
+          contact_info: selectedCustomer?.phone || selectedCustomer?.email || '',
           credit_limit: accountForm.credit_limit,
           available_credit: accountForm.credit_limit,
           current_balance: 0,
@@ -142,17 +130,7 @@ const CreditCRMManagement: React.FC = () => {
   const createTransaction = async () => {
     if (!selectedAccount) return;
     try {
-      const { error: transactionError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          credit_account_id: selectedAccount.id,
-          transaction_type: transactionForm.transaction_type,
-          amount: transactionForm.amount,
-          reference: transactionForm.reference,
-          transaction_date: new Date().toISOString(),
-        });
-      if (transactionError) throw transactionError;
-      // Update account balance
+      // Update account balance directly since credit_transactions table doesn't exist
       let newBalance = selectedAccount.current_balance;
       let newAvailable = selectedAccount.available_credit;
       if (transactionForm.transaction_type === 'credit') {
@@ -171,7 +149,6 @@ const CreditCRMManagement: React.FC = () => {
       setTransactionForm({ transaction_type: 'payment', amount: 0, reference: '' });
       setIsTransactionDialogOpen(false);
       fetchCreditAccounts();
-      if (selectedAccount) fetchTransactions(selectedAccount.id);
     } catch (error: any) {
       toast({ title: 'Error', description: error?.message || 'Failed to record transaction', variant: 'destructive' });
     }
@@ -369,4 +346,4 @@ const CreditCRMManagement: React.FC = () => {
   );
 };
 
-export default CreditCRMManagement; 
+export default CreditCRMManagement;

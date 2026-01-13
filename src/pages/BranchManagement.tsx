@@ -34,22 +34,16 @@ const BranchManagement: React.FC = () => {
 
   useEffect(() => {
     async function fetchBranchAnalytics() {
-      // Fetch orders for all branches
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('id, total_amount, branch_id')
-        .in('branch_id', branches.map(b => b.id));
-      if (ordersError) return;
-      const totalOrders = (orders || []).length;
-      const totalSales = (orders || []).reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-      // Fetch products for all branches
+      // Fetch products for all branches to count low stock items
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, stock, min_stock_level, branch_id')
         .in('branch_id', branches.map(b => b.id));
       if (productsError) return;
       const lowStockItems = (products || []).filter((p: any) => Number(p.stock) <= Number(p.min_stock_level)).length;
-      setStats({ totalOrders, totalSales, lowStockItems });
+      
+      // For now, set mock values for orders since the orders table doesn't have branch_id
+      setStats({ totalOrders: 0, totalSales: 0, lowStockItems });
     }
     if (branches.length > 0) fetchBranchAnalytics();
   }, [branches]);
@@ -315,4 +309,4 @@ const BranchManagement: React.FC = () => {
   );
 };
 
-export default BranchManagement; 
+export default BranchManagement;

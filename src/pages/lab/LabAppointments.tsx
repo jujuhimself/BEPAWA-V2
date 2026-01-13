@@ -27,7 +27,7 @@ interface LabAppointment {
   notes?: string;
   patient_name: string;
   patient_phone?: string;
-  priority?: 'urgent' | 'emergency';
+  priority?: string;
 }
 
 const LabAppointments = () => {
@@ -99,16 +99,19 @@ const LabAppointments = () => {
         profilesMap.set(profile.id, profile);
       });
 
-      // 4. Merge profile info into appointments
+      // 4. Merge profile info into appointments with proper type casting
       const typedAppointments: LabAppointment[] = appointmentsData.map(apt => {
         const profile = profilesMap.get(apt.user_id);
+        const validStatuses = ['scheduled', 'confirmed', 'in-progress', 'completed', 'cancelled'];
+        const status = validStatuses.includes(apt.status) ? apt.status as LabAppointment['status'] : 'scheduled';
+        
         return {
           id: apt.id,
           user_id: apt.user_id,
           service_type: apt.service_type,
           appointment_date: apt.appointment_date,
           appointment_time: apt.appointment_time,
-          status: apt.status as 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled',
+          status,
           notes: apt.notes || undefined,
           patient_name: profile?.name || 'Unknown',
           patient_phone: profile?.phone || 'Unknown',
@@ -243,7 +246,7 @@ const LabAppointments = () => {
                       <Badge className={getStatusColor(appointment.status)}>
                         {appointment.status}
                       </Badge>
-                      {['urgent', 'emergency'].includes(appointment.priority) && (
+                      {appointment.priority && ['urgent', 'emergency'].includes(appointment.priority) && (
                         <Badge className={appointment.priority === 'urgent' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}>
                           {appointment.priority.charAt(0).toUpperCase() + appointment.priority.slice(1)}
                         </Badge>
@@ -251,7 +254,7 @@ const LabAppointments = () => {
                     </div>
                   </div>
                   
-                  {['urgent', 'emergency'].includes(appointment.priority) && (
+                  {appointment.priority && ['urgent', 'emergency'].includes(appointment.priority) && (
                     <div className="mt-2">
                       <span className="block text-xs text-red-700 font-semibold mb-1">This appointment requires immediate attention.</span>
                       {appointment.user_id && patientPhones[appointment.user_id] ? (
