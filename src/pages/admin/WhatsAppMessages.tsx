@@ -57,9 +57,22 @@ const WhatsAppMessages = () => {
               .eq('conversation_id', convo.id)
               .order('created_at', { ascending: true });
 
+            // Map messages to ensure correct role type
+            const typedMessages: WhatsAppMessage[] = (messages || []).map((msg: any) => ({
+              id: msg.id,
+              role: (msg.role === 'assistant' || msg.role === 'user') ? msg.role : 'user',
+              content: msg.content,
+              created_at: msg.created_at,
+              metadata: msg.metadata
+            }));
+
             return {
-              ...convo,
-              messages: messages || []
+              id: convo.id,
+              phone_number: convo.phone_number || '',
+              language: convo.language || 'en',
+              created_at: convo.created_at,
+              updated_at: convo.updated_at,
+              messages: typedMessages
             };
           })
         );

@@ -42,7 +42,25 @@ const LabQualityControl = () => {
         .select('*')
         .order('check_date', { ascending: false });
       if (error) throw error;
-      setChecks(data || []);
+      
+      // Map and validate the data to match our interface
+      const mappedChecks: QualityControlCheck[] = (data || []).map((item: any) => {
+        const validCheckTypes = ['daily', 'weekly', 'monthly', 'calibration'];
+        const validStatuses = ['passed', 'failed', 'pending'];
+        
+        return {
+          id: item.id,
+          equipment_name: item.equipment_name,
+          check_type: validCheckTypes.includes(item.check_type) ? item.check_type : 'daily',
+          status: validStatuses.includes(item.status) ? item.status : 'pending',
+          checked_by: item.checked_by,
+          check_date: item.check_date,
+          next_check_date: item.next_check_date,
+          notes: item.notes || undefined,
+        };
+      });
+      
+      setChecks(mappedChecks);
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to load quality control checks', variant: 'destructive' });
     }
@@ -60,7 +78,23 @@ const LabQualityControl = () => {
         .select()
         .single();
       if (error) throw error;
-      setChecks([data, ...checks]);
+      
+      // Map the returned data to match our interface
+      const validCheckTypes = ['daily', 'weekly', 'monthly', 'calibration'];
+      const validStatuses = ['passed', 'failed', 'pending'];
+      
+      const mappedCheck: QualityControlCheck = {
+        id: data.id,
+        equipment_name: data.equipment_name,
+        check_type: validCheckTypes.includes(data.check_type) ? data.check_type as QualityControlCheck['check_type'] : 'daily',
+        status: validStatuses.includes(data.status) ? data.status as QualityControlCheck['status'] : 'pending',
+        checked_by: data.checked_by,
+        check_date: data.check_date,
+        next_check_date: data.next_check_date,
+        notes: data.notes || undefined,
+      };
+      
+      setChecks([mappedCheck, ...checks]);
       toast({
         title: 'Quality control check created',
         description: `New ${newCheck.check_type} check for ${newCheck.equipment_name} has been recorded.`,
@@ -89,7 +123,23 @@ const LabQualityControl = () => {
         .select()
         .single();
       if (error) throw error;
-      setChecks(checks.map(check => check.id === id ? data : check));
+      
+      // Map the returned data
+      const validCheckTypes = ['daily', 'weekly', 'monthly', 'calibration'];
+      const validStatuses = ['passed', 'failed', 'pending'];
+      
+      const mappedCheck: QualityControlCheck = {
+        id: data.id,
+        equipment_name: data.equipment_name,
+        check_type: validCheckTypes.includes(data.check_type) ? data.check_type as QualityControlCheck['check_type'] : 'daily',
+        status: validStatuses.includes(data.status) ? data.status as QualityControlCheck['status'] : 'pending',
+        checked_by: data.checked_by,
+        check_date: data.check_date,
+        next_check_date: data.next_check_date,
+        notes: data.notes || undefined,
+      };
+      
+      setChecks(checks.map(check => check.id === id ? mappedCheck : check));
       toast({ title: 'Check updated', description: 'Quality control check has been updated successfully.' });
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to update quality control check', variant: 'destructive' });
@@ -280,7 +330,7 @@ const LabQualityControl = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => handleUpdateCheck(check.id, { status: 'completed' as any })}
+                      onClick={() => handleUpdateCheck(check.id, { status: 'passed' })}
                     >
                       Update Check
                     </Button>

@@ -130,12 +130,12 @@ const WholesaleDashboard = () => {
       const totalOrders = (allOrders || []).length || 0;
       const activeRetailers = new Set((allOrders || []).map((o: any) => o.pharmacy_id)).size;
 
-      // Count low stock items (mock, or fetch products if you want)
+      // Count low stock items
       let lowStockItems = 0;
       const { data: productData } = await supabase
         .from('products')
-        .select('id, stock, min_stock')
-        .eq('owner_id', user.id); // Using owner_id instead of wholesaler_id
+        .select('id, stock, min_stock_level')
+        .eq('wholesaler_id', user.id);
 
       if (productData) {
         lowStockItems = productData.filter((prod: any) => Number(prod.stock) <= Number(prod.min_stock)).length;

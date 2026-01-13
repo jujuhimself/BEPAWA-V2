@@ -13,7 +13,7 @@ export const useSubscription = () => {
   const canAccessPlan = (requiredPlan: SubscriptionPlan) => {
     if (!userSubscription) return false;
     
-    const planLevels = {
+    const planLevels: Record<SubscriptionPlan, number> = {
       'basic': 1,
       'medium': 2,
       'premium': 3
@@ -38,15 +38,15 @@ export const useSubscription = () => {
   const getCurrentCounts = async () => {
     if (!userSubscription) return { staffCount: 0, branchCount: 0 };
     
-    const { data: staffCount } = await supabase
+    const { count: staffCount } = await supabase
       .from('staff_members')
-      .select('count', { count: 'exact' })
+      .select('*', { count: 'exact', head: true })
       .eq('pharmacy_id', userSubscription.userId);
 
-    const { data: branchCount } = await supabase
+    const { count: branchCount } = await supabase
       .from('branches')
-      .select('count', { count: 'exact' })
-      .eq('pharmacy_id', userSubscription.userId);
+      .select('*', { count: 'exact', head: true })
+      .eq('parent_id', userSubscription.userId);
 
     return {
       staffCount: staffCount || 0,
