@@ -2,14 +2,18 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, ShoppingCart, Minus, Plus, Trash2 } from "lucide-react";
+import { CreditCard, ShoppingCart, Minus, Plus, Trash2, Truck, MapPin, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from '@/integrations/supabase/types';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { orderService } from '@/services/orderService';
 import { inventoryService } from '@/services/inventoryService';
+import { useCreateCODOrder } from '@/hooks/useDelivery';
 
 interface CartItem {
   id: string;
@@ -18,6 +22,7 @@ interface CartItem {
   quantity: number;
   manufacturer: string;
   category: string;
+  pharmacy_id?: string;
 }
 
 const Cart = () => {
@@ -30,6 +35,14 @@ const Cart = () => {
   const [cardDetails, setCardDetails] = useState({ name: '', number: '', expiry: '', cvc: '' });
   const [cardLoading, setCardLoading] = useState(false);
   const [cardType, setCardType] = useState<'visa' | 'mastercard' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod'>('card');
+  
+  // COD delivery details
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  
+  const createCODOrder = useCreateCODOrder();
 
   useEffect(() => {
     fetchCart();
@@ -131,6 +144,49 @@ const Cart = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  const getDeliveryFee = () => {
+    // Standard delivery fee for COD
+    return 2500;
+  };
+
+  const handleCODCheckout = async () => {
+    if (!user) return;
+    if (!deliveryAddress || !deliveryPhone) {
+      toast({ 
+        title: 'Missing Information', 
+        description: 'Please provide delivery address and phone number', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    // Get the pharmacy_id from cart items (assuming all items are from same pharmacy)
+    const pharmacyId = cartItems[0]?.pharmacy_id;
+    if (!pharmacyId) {
+      toast({ 
+        title: 'Error', 
+        description: 'Unable to determine pharmacy. Please try again.', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    createCODOrder.mutate({
+      user_id: user.id,
+      items: cartItems,
+      total_amount: getTotalPrice() + getDeliveryFee(),
+      delivery_address: deliveryAddress,
+      delivery_phone: deliveryPhone,
+      delivery_notes: deliveryNotes,
+      pharmacy_id: pharmacyId
+    }, {
+      onSuccess: async () => {
+        await clearCart();
+        navigate('/my-orders');
+      }
+    });
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -166,6 +222,8 @@ const Cart = () => {
       </div>
     );
   }
+
+  const isIndividual = user.role === 'individual';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
@@ -230,6 +288,7 @@ const Cart = () => {
               </CardContent>
             </Card>
           </div>
+          
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <Card>
@@ -242,114 +301,302 @@ const Cart = () => {
                     <span>Subtotal:</span>
                     <span>TZS {getTotalPrice().toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Delivery:</span>
-                    <span className="text-green-600">Free</span>
-                  </div>
+                  {isIndividual && paymentMethod === 'cod' && (
+                    <div className="flex justify-between">
+                      <span>Delivery Fee:</span>
+                      <span>TZS {getDeliveryFee().toLocaleString()}</span>
+                    </div>
+                  )}
+                  {!isIndividual && (
+                    <div className="flex justify-between">
+                      <span>Delivery:</span>
+                      <span className="text-green-600">Free</span>
+                    </div>
+                  )}
                   <div className="border-t pt-2">
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total:</span>
-                      <span>TZS {getTotalPrice().toLocaleString()}</span>
+                      <span>TZS {(getTotalPrice() + (isIndividual && paymentMethod === 'cod' ? getDeliveryFee() : 0)).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
-                <Button
-                  className="w-full mt-2 flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-500 text-white text-lg py-3"
-                  onClick={() => setShowCardForm((v) => !v)}
-                  disabled={isLoading || cardLoading || cartItems.length === 0}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  {cardLoading ? "Processing..." : "Pay with Card"}
-                </Button>
-                {showCardForm && (
-                  <Card className="max-w-md mx-auto mt-8 shadow-lg border-2 border-blue-100">
-                    <CardHeader>
-                      <CardTitle className="text-2xl font-bold text-blue-700 mb-2">Pay with Card</CardTitle>
-                      <div className="flex gap-4 mb-4">
-                        <button type="button" className={`p-2 rounded-lg border-2 ${cardType==='visa' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`} onClick={()=>setCardType('visa')}>
-                          <img src="/visa.png" alt="Visa" className="h-8" />
-                        </button>
-                        <button type="button" className={`p-2 rounded-lg border-2 ${cardType==='mastercard' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200'}`} onClick={()=>setCardType('mastercard')}>
-                          <img src="/mastercard.png" alt="Mastercard" className="h-8" />
-                        </button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <form
-                        className="space-y-4"
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          setCardLoading(true);
-                          try {
-                            // Simulate payment delay
-                            await new Promise((res) => setTimeout(res, 1200));
-                            // Create order in DB
-                            const order = await orderService.createPlatformOrder({
-                              user_id: user.id,
-                              order_type: 'retail',
-                              order_number: undefined,
-                              total_amount: getTotalPrice(),
-                              status: 'completed',
-                              payment_status: 'paid',
-                              items: cartItems,
-                            });
-                            // Deduct stock for each item
-                            for (const item of cartItems) {
-                              const product = await inventoryService.getProduct(item.id);
-                              if (product) {
-                                await inventoryService.updateStock(item.id, Math.max(0, product.stock - item.quantity), 'Card payment');
-                              }
-                            }
-                            await clearCart();
-                            toast({ title: 'Payment Successful', description: 'Your order has been placed!' });
-                            navigate('/checkout-success');
-                          } catch (err) {
-                            toast({ title: 'Payment Error', description: err.message || 'Could not complete payment.', variant: 'destructive' });
-                          } finally {
-                            setCardLoading(false);
-                            setShowCardForm(false);
-                          }
-                        }}
+
+                {/* Payment Method Selection for Individual Users */}
+                {isIndividual ? (
+                  <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as 'card' | 'cod')}>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="card" className="flex items-center gap-1">
+                        <CreditCard className="h-4 w-4" />
+                        Card
+                      </TabsTrigger>
+                      <TabsTrigger value="cod" className="flex items-center gap-1">
+                        <Truck className="h-4 w-4" />
+                        COD
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="card" className="space-y-4">
+                      <Button
+                        className="w-full flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-500 text-white text-lg py-3"
+                        onClick={() => setShowCardForm((v) => !v)}
+                        disabled={isLoading || cardLoading || cartItems.length === 0}
                       >
-                        <Input
-                          placeholder="Cardholder Name"
-                          value={cardDetails.name}
-                          onChange={e => setCardDetails({ ...cardDetails, name: e.target.value })}
-                          required
-                          className="bg-blue-50 border-blue-200 focus:ring-blue-500"
-                        />
-                        <Input
-                          placeholder="Card Number"
-                          value={cardDetails.number}
-                          onChange={e => setCardDetails({ ...cardDetails, number: e.target.value })}
-                          required
-                          maxLength={19}
-                          className="bg-blue-50 border-blue-200 focus:ring-blue-500"
-                        />
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="MM/YY"
-                            value={cardDetails.expiry}
-                            onChange={e => setCardDetails({ ...cardDetails, expiry: e.target.value })}
+                        <CreditCard className="h-5 w-5" />
+                        {cardLoading ? "Processing..." : "Pay with Card"}
+                      </Button>
+                      
+                      {showCardForm && (
+                        <Card className="shadow-lg border-2 border-blue-100">
+                          <CardHeader>
+                            <CardTitle className="text-xl font-bold text-blue-700">Card Details</CardTitle>
+                            <div className="flex gap-4">
+                              <button type="button" className={`p-2 rounded-lg border-2 ${cardType==='visa' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`} onClick={()=>setCardType('visa')}>
+                                <img src="/visa.png" alt="Visa" className="h-6" />
+                              </button>
+                              <button type="button" className={`p-2 rounded-lg border-2 ${cardType==='mastercard' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200'}`} onClick={()=>setCardType('mastercard')}>
+                                <img src="/mastercard.png" alt="Mastercard" className="h-6" />
+                              </button>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <form
+                              className="space-y-3"
+                              onSubmit={async (e) => {
+                                e.preventDefault();
+                                setCardLoading(true);
+                                try {
+                                  await new Promise((res) => setTimeout(res, 1200));
+                                  const order = await orderService.createPlatformOrder({
+                                    user_id: user.id,
+                                    order_type: 'retail',
+                                    order_number: undefined,
+                                    total_amount: getTotalPrice(),
+                                    status: 'completed',
+                                    payment_status: 'paid',
+                                    items: cartItems,
+                                  });
+                                  for (const item of cartItems) {
+                                    const product = await inventoryService.getProduct(item.id);
+                                    if (product) {
+                                      await inventoryService.updateStock(item.id, Math.max(0, product.stock - item.quantity), 'Card payment');
+                                    }
+                                  }
+                                  await clearCart();
+                                  toast({ title: 'Payment Successful', description: 'Your order has been placed!' });
+                                  navigate('/checkout-success');
+                                } catch (err: any) {
+                                  toast({ title: 'Payment Error', description: err.message || 'Could not complete payment.', variant: 'destructive' });
+                                } finally {
+                                  setCardLoading(false);
+                                  setShowCardForm(false);
+                                }
+                              }}
+                            >
+                              <Input
+                                placeholder="Cardholder Name"
+                                value={cardDetails.name}
+                                onChange={e => setCardDetails({ ...cardDetails, name: e.target.value })}
+                                required
+                                className="bg-blue-50 border-blue-200"
+                              />
+                              <Input
+                                placeholder="Card Number"
+                                value={cardDetails.number}
+                                onChange={e => setCardDetails({ ...cardDetails, number: e.target.value })}
+                                required
+                                maxLength={19}
+                                className="bg-blue-50 border-blue-200"
+                              />
+                              <div className="flex gap-2">
+                                <Input
+                                  placeholder="MM/YY"
+                                  value={cardDetails.expiry}
+                                  onChange={e => setCardDetails({ ...cardDetails, expiry: e.target.value })}
+                                  required
+                                  maxLength={5}
+                                  className="bg-blue-50 border-blue-200"
+                                />
+                                <Input
+                                  placeholder="CVC"
+                                  value={cardDetails.cvc}
+                                  onChange={e => setCardDetails({ ...cardDetails, cvc: e.target.value })}
+                                  required
+                                  maxLength={4}
+                                  className="bg-blue-50 border-blue-200"
+                                />
+                              </div>
+                              <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-green-500 text-white" disabled={cardLoading}>
+                                {cardLoading ? 'Processing...' : 'Pay Now'}
+                              </Button>
+                            </form>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+                    
+                    <TabsContent value="cod" className="space-y-4">
+                      <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                        <p className="text-sm text-yellow-800 flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          Pay cash when your order is delivered by our Boda rider
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="delivery-address" className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            Delivery Address
+                          </Label>
+                          <Textarea
+                            id="delivery-address"
+                            placeholder="Enter your full delivery address..."
+                            value={deliveryAddress}
+                            onChange={(e) => setDeliveryAddress(e.target.value)}
+                            className="mt-1"
                             required
-                            maxLength={5}
-                            className="bg-blue-50 border-blue-200 focus:ring-blue-500"
-                          />
-                          <Input
-                            placeholder="CVC"
-                            value={cardDetails.cvc}
-                            onChange={e => setCardDetails({ ...cardDetails, cvc: e.target.value })}
-                            required
-                            maxLength={4}
-                            className="bg-blue-50 border-blue-200 focus:ring-blue-500"
                           />
                         </div>
-                        <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-green-500 text-white text-lg py-3 rounded-lg shadow-md hover:from-blue-700 hover:to-green-600 transition-all duration-200" disabled={cardLoading}>
-                          {cardLoading ? 'Processing...' : 'Pay Now'}
-                        </Button>
-                      </form>
-                    </CardContent>
-                  </Card>
+                        
+                        <div>
+                          <Label htmlFor="delivery-phone" className="flex items-center gap-1">
+                            <Phone className="h-4 w-4" />
+                            Phone Number
+                          </Label>
+                          <Input
+                            id="delivery-phone"
+                            type="tel"
+                            placeholder="+255 7XX XXX XXX"
+                            value={deliveryPhone}
+                            onChange={(e) => setDeliveryPhone(e.target.value)}
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="delivery-notes">
+                            Delivery Notes (optional)
+                          </Label>
+                          <Textarea
+                            id="delivery-notes"
+                            placeholder="Any special instructions for the rider..."
+                            value={deliveryNotes}
+                            onChange={(e) => setDeliveryNotes(e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+                      
+                      <Button
+                        className="w-full flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-lg py-3"
+                        onClick={handleCODCheckout}
+                        disabled={createCODOrder.isPending || !deliveryAddress || !deliveryPhone}
+                      >
+                        <Truck className="h-5 w-5" />
+                        {createCODOrder.isPending ? "Placing Order..." : "Place COD Order"}
+                      </Button>
+                    </TabsContent>
+                  </Tabs>
+                ) : (
+                  /* Non-individual users (retail/wholesale) */
+                  <>
+                    <Button
+                      className="w-full flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-500 text-white text-lg py-3"
+                      onClick={() => setShowCardForm((v) => !v)}
+                      disabled={isLoading || cardLoading || cartItems.length === 0}
+                    >
+                      <CreditCard className="h-5 w-5" />
+                      {cardLoading ? "Processing..." : "Pay with Card"}
+                    </Button>
+                    {showCardForm && (
+                      <Card className="shadow-lg border-2 border-blue-100">
+                        <CardHeader>
+                          <CardTitle className="text-xl font-bold text-blue-700">Card Details</CardTitle>
+                          <div className="flex gap-4">
+                            <button type="button" className={`p-2 rounded-lg border-2 ${cardType==='visa' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`} onClick={()=>setCardType('visa')}>
+                              <img src="/visa.png" alt="Visa" className="h-6" />
+                            </button>
+                            <button type="button" className={`p-2 rounded-lg border-2 ${cardType==='mastercard' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200'}`} onClick={()=>setCardType('mastercard')}>
+                              <img src="/mastercard.png" alt="Mastercard" className="h-6" />
+                            </button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <form
+                            className="space-y-3"
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              setCardLoading(true);
+                              try {
+                                await new Promise((res) => setTimeout(res, 1200));
+                                const order = await orderService.createPlatformOrder({
+                                  user_id: user.id,
+                                  order_type: user.role === 'wholesale' ? 'wholesale' : 'retail',
+                                  order_number: undefined,
+                                  total_amount: getTotalPrice(),
+                                  status: 'completed',
+                                  payment_status: 'paid',
+                                  items: cartItems,
+                                });
+                                for (const item of cartItems) {
+                                  const product = await inventoryService.getProduct(item.id);
+                                  if (product) {
+                                    await inventoryService.updateStock(item.id, Math.max(0, product.stock - item.quantity), 'Card payment');
+                                  }
+                                }
+                                await clearCart();
+                                toast({ title: 'Payment Successful', description: 'Your order has been placed!' });
+                                navigate('/checkout-success');
+                              } catch (err: any) {
+                                toast({ title: 'Payment Error', description: err.message || 'Could not complete payment.', variant: 'destructive' });
+                              } finally {
+                                setCardLoading(false);
+                                setShowCardForm(false);
+                              }
+                            }}
+                          >
+                            <Input
+                              placeholder="Cardholder Name"
+                              value={cardDetails.name}
+                              onChange={e => setCardDetails({ ...cardDetails, name: e.target.value })}
+                              required
+                              className="bg-blue-50 border-blue-200"
+                            />
+                            <Input
+                              placeholder="Card Number"
+                              value={cardDetails.number}
+                              onChange={e => setCardDetails({ ...cardDetails, number: e.target.value })}
+                              required
+                              maxLength={19}
+                              className="bg-blue-50 border-blue-200"
+                            />
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="MM/YY"
+                                value={cardDetails.expiry}
+                                onChange={e => setCardDetails({ ...cardDetails, expiry: e.target.value })}
+                                required
+                                maxLength={5}
+                                className="bg-blue-50 border-blue-200"
+                              />
+                              <Input
+                                placeholder="CVC"
+                                value={cardDetails.cvc}
+                                onChange={e => setCardDetails({ ...cardDetails, cvc: e.target.value })}
+                                required
+                                maxLength={4}
+                                className="bg-blue-50 border-blue-200"
+                              />
+                            </div>
+                            <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-green-500 text-white" disabled={cardLoading}>
+                              {cardLoading ? 'Processing...' : 'Pay Now'}
+                            </Button>
+                          </form>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
