@@ -324,6 +324,146 @@ class NotificationService {
     });
   }
 
+  // ==========================================
+  // COD / DELIVERY NOTIFICATION METHODS
+  // ==========================================
+
+  // Send notification when new COD order is placed (to pharmacy)
+  async sendNewCODOrderNotification(pharmacyUserId: string, orderNumber: string, totalAmount: number) {
+    return this.createNotification({
+      user_id: pharmacyUserId,
+      title: 'New COD Order Received',
+      message: `Order #${orderNumber} for TZS ${totalAmount.toLocaleString()} requires confirmation. Review and accept to prepare.`,
+      type: 'info',
+      metadata: {
+        category: 'cod_order',
+        priority: 'high',
+        actionUrl: '/pharmacy',
+        actionLabel: 'View Order'
+      }
+    });
+  }
+
+  // Send notification when pharmacy accepts order (to customer)
+  async sendOrderAcceptedNotification(customerId: string, orderNumber: string) {
+    return this.createNotification({
+      user_id: customerId,
+      title: 'Order Accepted!',
+      message: `Your order #${orderNumber} has been accepted by the pharmacy and is being prepared.`,
+      type: 'success',
+      metadata: {
+        category: 'cod_order',
+        priority: 'medium',
+        actionUrl: '/my-orders',
+        actionLabel: 'Track Order'
+      }
+    });
+  }
+
+  // Send notification when pharmacy rejects order (to customer)
+  async sendOrderRejectedNotification(customerId: string, orderNumber: string, reason: string) {
+    return this.createNotification({
+      user_id: customerId,
+      title: 'Order Could Not Be Fulfilled',
+      message: `Your order #${orderNumber} was not accepted. Reason: ${reason}`,
+      type: 'error',
+      metadata: {
+        category: 'cod_order',
+        priority: 'high'
+      }
+    });
+  }
+
+  // Send notification when order is ready for pickup (to rider)
+  async sendOrderReadyForPickupNotification(riderId: string, orderNumber: string, pharmacyName: string) {
+    return this.createNotification({
+      user_id: riderId,
+      title: 'New Delivery Assignment',
+      message: `Order #${orderNumber} is ready for pickup from ${pharmacyName}.`,
+      type: 'info',
+      metadata: {
+        category: 'delivery',
+        priority: 'high',
+        actionUrl: '/rider',
+        actionLabel: 'View Assignment'
+      }
+    });
+  }
+
+  // Send notification when rider accepts delivery (to pharmacy)
+  async sendRiderAcceptedNotification(pharmacyUserId: string, orderNumber: string, riderName: string) {
+    return this.createNotification({
+      user_id: pharmacyUserId,
+      title: 'Rider En Route',
+      message: `${riderName} has accepted the delivery for order #${orderNumber} and is heading to pickup.`,
+      type: 'info',
+      metadata: {
+        category: 'delivery',
+        priority: 'medium'
+      }
+    });
+  }
+
+  // Send notification when rider picks up order (to customer)
+  async sendOrderPickedUpNotification(customerId: string, orderNumber: string, riderName: string) {
+    return this.createNotification({
+      user_id: customerId,
+      title: 'Order On The Way!',
+      message: `${riderName} has picked up your order #${orderNumber} and is heading to you.`,
+      type: 'success',
+      metadata: {
+        category: 'delivery',
+        priority: 'high',
+        actionUrl: '/my-orders',
+        actionLabel: 'Track Delivery'
+      }
+    });
+  }
+
+  // Send notification when order is delivered (to customer)
+  async sendOrderDeliveredNotification(customerId: string, orderNumber: string) {
+    return this.createNotification({
+      user_id: customerId,
+      title: 'Order Delivered!',
+      message: `Your order #${orderNumber} has been successfully delivered. Thank you for shopping with us!`,
+      type: 'success',
+      metadata: {
+        category: 'delivery',
+        priority: 'medium'
+      }
+    });
+  }
+
+  // Send notification when delivery fails (to pharmacy)
+  async sendDeliveryFailedNotification(pharmacyUserId: string, orderNumber: string, reason: string) {
+    return this.createNotification({
+      user_id: pharmacyUserId,
+      title: 'Delivery Failed',
+      message: `Delivery for order #${orderNumber} failed. Reason: ${reason}`,
+      type: 'warning',
+      metadata: {
+        category: 'delivery',
+        priority: 'high',
+        actionUrl: '/pharmacy',
+        actionLabel: 'View Details'
+      }
+    });
+  }
+
+  // Send notification to rider for cash remittance reminder
+  async sendCashRemittanceReminder(riderId: string, totalAmount: number, ordersCount: number) {
+    return this.createNotification({
+      user_id: riderId,
+      title: 'Cash Remittance Due',
+      message: `You have TZS ${totalAmount.toLocaleString()} from ${ordersCount} deliveries pending remittance.`,
+      type: 'warning',
+      metadata: {
+        category: 'delivery',
+        priority: 'high'
+      }
+    });
+  }
+
   // Get user notifications
   async getUserNotifications(userId: string) {
     try {

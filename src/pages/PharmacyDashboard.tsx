@@ -20,6 +20,7 @@ import PharmacyStatsCards from "@/components/pharmacy/PharmacyStatsCards";
 import PharmacyQuickActions from "@/components/pharmacy/PharmacyQuickActions";
 import PharmacyAdditionalServices from "@/components/pharmacy/PharmacyAdditionalServices";
 import PharmacyRecentOrders from "@/components/pharmacy/PharmacyRecentOrders";
+import PharmacyCODOrders from "@/components/pharmacy/PharmacyCODOrders";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -234,6 +235,12 @@ export default function PharmacyDashboard() {
           </div>
 
           <PharmacyQuickActions cartItems={stats.cartItems} />
+          
+          {/* COD Orders Section */}
+          <div className="mb-8">
+            <PharmacyCODOrders />
+          </div>
+          
           <PharmacyAdditionalServices />
           <PharmacyRecentOrders recentOrders={recentOrders} />
           

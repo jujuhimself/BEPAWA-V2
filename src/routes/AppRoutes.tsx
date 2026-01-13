@@ -540,6 +540,11 @@ const AppRoutes = () => {
           <RiderDashboard />
         </RouteGuard>
       } />
+      <Route path="/rider" element={
+        <RouteGuard allowedRoles={['delivery']}>
+          <RiderDashboard />
+        </RouteGuard>
+      } />
 
       {/* Credit Management Redirect Route */}
       <Route path="/credit-management" element={<CreditManagementRedirect />} />

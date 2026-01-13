@@ -1,9 +1,4 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import { Resend } from 'npm:resend@2.0.0';
-
-// Use provided Resend credentials
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || 're_GbvzrxQd_2rA7mcar29C4VDdkaM72cKsr';
-const resend = new Resend(RESEND_API_KEY);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,18 +20,35 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { to, subject, html, from }: EmailRequest = await req.json();
 
-    // Use provided email address
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (!RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY is not configured');
+    }
+
     const fromEmail = from || Deno.env.get('RESEND_FROM_EMAIL') || 'support@bepawaa.com';
 
     console.log('Sending email to:', to, 'Subject:', subject);
 
-    const emailResponse = await resend.emails.send({
-      from: `Bepawa Platform <${fromEmail}>`,
-      to: Array.isArray(to) ? to : [to],
-      subject,
-      html,
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `Bepawa Platform <${fromEmail}>`,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+      }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Resend API error: ${errorData}`);
+    }
+
+    const emailResponse = await response.json();
     console.log('Email sent successfully:', emailResponse);
 
     return new Response(JSON.stringify({ success: true, data: emailResponse }), {
