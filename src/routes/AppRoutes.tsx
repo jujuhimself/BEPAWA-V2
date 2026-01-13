@@ -93,6 +93,7 @@ import Pharmacies from "@/pages/Pharmacies";
 import NotFound from "@/pages/NotFound";
 import Analytics from "@/pages/Analytics";
 import CheckoutSuccess from '@/pages/CheckoutSuccess';
+import RiderDashboard from '@/pages/delivery/RiderDashboard';
 
 const CreditManagementRedirect = () => {
   const { user } = useAuth();
@@ -532,6 +533,13 @@ const AppRoutes = () => {
 
       {/* Order Success Route */}
       <Route path="/checkout-success" element={<CheckoutSuccess />} />
+
+      {/* Delivery/Rider Routes */}
+      <Route path="/delivery" element={
+        <RouteGuard allowedRoles={['delivery']}>
+          <RiderDashboard />
+        </RouteGuard>
+      } />
 
       {/* Credit Management Redirect Route */}
       <Route path="/credit-management" element={<CreditManagementRedirect />} />

@@ -991,6 +991,91 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_assignments: {
+        Row: {
+          actual_delivery_time: string | null
+          actual_pickup_time: string | null
+          cash_amount: number | null
+          cash_collected: boolean | null
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          delivery_address: string | null
+          delivery_notes: string | null
+          estimated_delivery_time: string | null
+          failure_reason: string | null
+          id: string
+          order_id: string
+          pharmacy_id: string
+          pickup_address: string | null
+          rider_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_time?: string | null
+          actual_pickup_time?: string | null
+          cash_amount?: number | null
+          cash_collected?: boolean | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          delivery_address?: string | null
+          delivery_notes?: string | null
+          estimated_delivery_time?: string | null
+          failure_reason?: string | null
+          id?: string
+          order_id: string
+          pharmacy_id: string
+          pickup_address?: string | null
+          rider_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_time?: string | null
+          actual_pickup_time?: string | null
+          cash_amount?: number | null
+          cash_collected?: boolean | null
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          delivery_address?: string | null
+          delivery_notes?: string | null
+          estimated_delivery_time?: string | null
+          failure_reason?: string | null
+          id?: string
+          order_id?: string
+          pharmacy_id?: string
+          pickup_address?: string | null
+          rider_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_assignments_pharmacy_id_fkey"
+            columns: ["pharmacy_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_assignments_rider_id_fkey"
+            columns: ["rider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expiry_alerts: {
         Row: {
           created_at: string | null
@@ -1742,7 +1827,14 @@ export type Database = {
       orders: {
         Row: {
           business_id: string | null
+          cash_collected: number | null
+          cash_collected_at: string | null
           created_at: string
+          delivered_at: string | null
+          delivery_address: string | null
+          delivery_fee: number | null
+          delivery_notes: string | null
+          delivery_phone: string | null
           id: string
           items: Json
           notes: string | null
@@ -1751,7 +1843,10 @@ export type Database = {
           payment_method: string | null
           payment_status: string
           pharmacy_id: string | null
+          picked_up_at: string | null
           profile_id: string | null
+          rider_assigned_at: string | null
+          rider_id: string | null
           role: string | null
           shipping_address: Json | null
           status: string
@@ -1762,7 +1857,14 @@ export type Database = {
         }
         Insert: {
           business_id?: string | null
+          cash_collected?: number | null
+          cash_collected_at?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_address?: string | null
+          delivery_fee?: number | null
+          delivery_notes?: string | null
+          delivery_phone?: string | null
           id?: string
           items: Json
           notes?: string | null
@@ -1771,7 +1873,10 @@ export type Database = {
           payment_method?: string | null
           payment_status?: string
           pharmacy_id?: string | null
+          picked_up_at?: string | null
           profile_id?: string | null
+          rider_assigned_at?: string | null
+          rider_id?: string | null
           role?: string | null
           shipping_address?: Json | null
           status?: string
@@ -1782,7 +1887,14 @@ export type Database = {
         }
         Update: {
           business_id?: string | null
+          cash_collected?: number | null
+          cash_collected_at?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_address?: string | null
+          delivery_fee?: number | null
+          delivery_notes?: string | null
+          delivery_phone?: string | null
           id?: string
           items?: Json
           notes?: string | null
@@ -1791,7 +1903,10 @@ export type Database = {
           payment_method?: string | null
           payment_status?: string
           pharmacy_id?: string | null
+          picked_up_at?: string | null
           profile_id?: string | null
+          rider_assigned_at?: string | null
+          rider_id?: string | null
           role?: string | null
           shipping_address?: Json | null
           status?: string
@@ -1804,6 +1919,13 @@ export type Database = {
           {
             foreignKeyName: "orders_profile_id_fkey"
             columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_rider_id_fkey"
+            columns: ["rider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2961,6 +3083,57 @@ export type Database = {
           },
         ]
       }
+      stock_reservations: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          product_id: string
+          quantity: number
+          released_at: string | null
+          reserved_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          product_id: string
+          quantity: number
+          released_at?: string | null
+          reserved_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          released_at?: string | null
+          reserved_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_reservations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_valuation: {
         Row: {
           branch_id: string
@@ -3396,12 +3569,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fulfill_order_stock: { Args: { p_order_id: string }; Returns: undefined }
       get_current_user_role: { Args: never; Returns: string }
       get_orders_by_retailer: {
         Args: { retailer_uuid: string }
         Returns: {
           business_id: string | null
+          cash_collected: number | null
+          cash_collected_at: string | null
           created_at: string
+          delivered_at: string | null
+          delivery_address: string | null
+          delivery_fee: number | null
+          delivery_notes: string | null
+          delivery_phone: string | null
           id: string
           items: Json
           notes: string | null
@@ -3410,7 +3591,10 @@ export type Database = {
           payment_method: string | null
           payment_status: string
           pharmacy_id: string | null
+          picked_up_at: string | null
           profile_id: string | null
+          rider_assigned_at: string | null
+          rider_id: string | null
           role: string | null
           shipping_address: Json | null
           status: string
@@ -3430,7 +3614,14 @@ export type Database = {
         Args: { wholesaler_uuid: string }
         Returns: {
           business_id: string | null
+          cash_collected: number | null
+          cash_collected_at: string | null
           created_at: string
+          delivered_at: string | null
+          delivery_address: string | null
+          delivery_fee: number | null
+          delivery_notes: string | null
+          delivery_phone: string | null
           id: string
           items: Json
           notes: string | null
@@ -3439,7 +3630,10 @@ export type Database = {
           payment_method: string | null
           payment_status: string
           pharmacy_id: string | null
+          picked_up_at: string | null
           profile_id: string | null
+          rider_assigned_at: string | null
+          rider_id: string | null
           role: string | null
           shipping_address: Json | null
           status: string
@@ -3590,11 +3784,22 @@ export type Database = {
           topic: string
         }[]
       }
+      release_order_stock: { Args: { p_order_id: string }; Returns: undefined }
+      reserve_order_stock: {
+        Args: { p_items: Json; p_order_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       subscription_plan_type: "basic" | "medium" | "premium"
       subscription_status_type: "trial" | "active" | "expired" | "cancelled"
-      user_role: "individual" | "retail" | "wholesale" | "lab" | "admin"
+      user_role:
+        | "individual"
+        | "retail"
+        | "wholesale"
+        | "lab"
+        | "admin"
+        | "delivery"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3724,7 +3929,14 @@ export const Constants = {
     Enums: {
       subscription_plan_type: ["basic", "medium", "premium"],
       subscription_status_type: ["trial", "active", "expired", "cancelled"],
-      user_role: ["individual", "retail", "wholesale", "lab", "admin"],
+      user_role: [
+        "individual",
+        "retail",
+        "wholesale",
+        "lab",
+        "admin",
+        "delivery",
+      ],
     },
   },
 } as const
