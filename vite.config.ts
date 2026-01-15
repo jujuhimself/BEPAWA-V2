@@ -9,11 +9,11 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true
-      }
-    }
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [
     react(),
@@ -23,11 +23,16 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force a single React instance throughout the bundle.
+      react: path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "./node_modules/react/jsx-runtime"),
+      "react/jsx-dev-runtime": path.resolve(__dirname, "./node_modules/react/jsx-dev-runtime"),
     },
-    dedupe: ['react', 'react-dom', 'react-router-dom'],
+    dedupe: ["react", "react-dom", "react-router-dom"],
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@radix-ui/react-tooltip', '@tanstack/react-query'],
+    include: ["react", "react-dom", "react-router-dom"],
     force: true,
   },
 }));
