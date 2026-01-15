@@ -56,7 +56,7 @@ export interface PlatformOrder {
   id: string;
   user_id: string;
   order_number: string;
-  order_type?: 'retail' | 'wholesale' | 'prescription' | 'lab';
+  order_type?: string;
   total_amount: number;
   status: string;
   payment_status: string;

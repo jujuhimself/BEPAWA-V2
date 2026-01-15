@@ -18,7 +18,7 @@ interface FormData {
   password: string;
   phone: string;
   address: string;
-  role: 'individual' | 'retail' | 'wholesale' | 'lab' | '';
+  role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery' | '';
   
   // Individual fields
   dateOfBirth: string;
@@ -39,6 +39,10 @@ interface FormData {
   labLicense: string;
   specializations: string;
   operatingHours: string;
+  
+  // Delivery fields
+  vehicleType: string;
+  vehicleRegistration: string;
 }
 
 const Register = () => {
@@ -62,6 +66,8 @@ const Register = () => {
     labLicense: "",
     specializations: "",
     operatingHours: "",
+    vehicleType: "",
+    vehicleRegistration: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -76,7 +82,7 @@ const Register = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRoleSelect = (role: 'individual' | 'retail' | 'wholesale' | 'lab') => {
+  const handleRoleSelect = (role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery') => {
     setFormData(prev => ({ ...prev, role }));
   };
 
@@ -105,6 +111,8 @@ const Register = () => {
       return formData.businessName && formData.businessLicense && formData.taxId;
     } else if (formData.role === 'lab') {
       return formData.labName && formData.labLicense && formData.specializations && formData.operatingHours;
+    } else if (formData.role === 'delivery') {
+      return formData.vehicleType && formData.vehicleRegistration;
     }
     return false;
   };
@@ -165,6 +173,9 @@ const Register = () => {
       userData.labLicense = formData.labLicense;
       userData.specializations = formData.specializations.split(',').map(s => s.trim());
       userData.operatingHours = formData.operatingHours;
+    } else if (formData.role === 'delivery') {
+      (userData as any).vehicleType = formData.vehicleType;
+      (userData as any).vehicleRegistration = formData.vehicleRegistration;
     }
 
     const result = await register(userData);
@@ -315,6 +326,7 @@ const Register = () => {
                 {formData.role === 'retail' && 'Pharmacy Information'}
                 {formData.role === 'wholesale' && 'Business Information'}
                 {formData.role === 'lab' && 'Lab Information'}
+                {formData.role === 'delivery' && 'Rider Information'}
               </h3>
               <p className="text-gray-600">Provide additional details for your account</p>
             </div>
@@ -464,6 +476,33 @@ const Register = () => {
                 </div>
               </div>
             )}
+
+            {formData.role === 'delivery' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleType">Vehicle Type *</Label>
+                    <Input
+                      id="vehicleType"
+                      placeholder="Motorcycle, Bicycle, etc."
+                      value={formData.vehicleType}
+                      onChange={(e) => handleInputChange('vehicleType', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleRegistration">Vehicle Registration *</Label>
+                    <Input
+                      id="vehicleRegistration"
+                      placeholder="T 123 ABC"
+                      value={formData.vehicleRegistration}
+                      onChange={(e) => handleInputChange('vehicleRegistration', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -491,6 +530,12 @@ const Register = () => {
                   )}
                   {formData.role === 'lab' && (
                     <div><span className="font-medium">Lab:</span> {formData.labName}</div>
+                  )}
+                  {formData.role === 'delivery' && (
+                    <>
+                      <div><span className="font-medium">Vehicle Type:</span> {formData.vehicleType}</div>
+                      <div><span className="font-medium">Registration:</span> {formData.vehicleRegistration}</div>
+                    </>
                   )}
                 </div>
               </CardContent>

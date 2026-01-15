@@ -10,7 +10,7 @@ export interface Prescription {
   prescription_date: string;
   diagnosis?: string;
   instructions?: string;
-  status: 'pending' | 'verified' | 'dispensed' | 'completed' | 'cancelled';
+  status: string;
   pharmacy_id?: string;
   verified_by?: string;
   verified_at?: string;
@@ -50,7 +50,6 @@ class PrescriptionService {
 
     return (data || []).map(prescription => ({
       ...prescription,
-      status: prescription.status as Prescription['status'],
       file_path: prescription.file_path ?? null,
     }));
   }
@@ -75,7 +74,6 @@ class PrescriptionService {
 
     return {
       ...data,
-      status: data.status as Prescription['status'],
       file_path: data.file_path ?? null,
     };
   }
@@ -110,7 +108,7 @@ class PrescriptionService {
     return data;
   }
 
-  async updatePrescriptionStatus(id: string, status: Prescription['status']): Promise<Prescription> {
+  async updatePrescriptionStatus(id: string, status: string): Promise<Prescription> {
     const { data, error } = await supabase
       .from('prescriptions')
       .update({ 
@@ -128,7 +126,6 @@ class PrescriptionService {
 
     return {
       ...data,
-      status: data.status as Prescription['status'],
       file_path: data.file_path ?? null,
     };
   }
@@ -164,34 +161,28 @@ class PrescriptionService {
         console.error('Error fetching shared prescription details:', sharedPrescError);
         throw sharedPrescError;
       }
-      shared = (sharedPrescriptions || []) as Prescription[];
+      shared = (sharedPrescriptions || []).map(p => ({
+        ...p,
+        file_path: p.file_path ?? null,
+      })) as Prescription[];
     }
-    // Map assigned and shared to ensure status is typed
+    // Map assigned
     const assignedTyped = (assigned || []).map(prescription => ({
       ...prescription,
-      status: (prescription.status as Prescription['status']),
       file_path: prescription.file_path ?? null,
-    }));
-    const sharedTyped = (shared || []).map(prescription => ({
-      ...prescription,
-      status: (prescription.status as Prescription['status']),
-      file_path: prescription.file_path ?? null,
-    }));
+    })) as Prescription[];
+    
     // Combine and deduplicate by prescription id
-    const all = [...assignedTyped, ...sharedTyped];
+    const all = [...assignedTyped, ...shared];
     const validStatuses = ['pending', 'verified', 'dispensed', 'completed', 'cancelled'];
     const result = Object.values(
       all.reduce((acc, curr) => {
         acc[curr.id] = curr;
         return acc;
       }, {} as Record<string, Prescription>)
-    ).filter((prescription: any) => validStatuses.includes(prescription.status))
-     .map((prescription: any) => ({
-      ...prescription,
-      status: prescription.status as Prescription['status'],
-      file_path: prescription.file_path ?? null,
-    }));
-    return result as Prescription[];
+    ).filter((prescription) => validStatuses.includes(prescription.status));
+    
+    return result;
   }
 }
 
