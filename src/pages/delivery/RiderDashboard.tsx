@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Store,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Locate
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
@@ -28,6 +29,8 @@ import {
   useMarkDeliveryFailed
 } from '@/hooks/useDelivery';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import DeliveryTrackingMap from '@/components/delivery/DeliveryTrackingMap';
 
 const RiderDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -42,13 +45,72 @@ const RiderDashboard: React.FC = () => {
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [cashAmount, setCashAmount] = useState('');
   const [failReason, setFailReason] = useState('');
+  const [isTracking, setIsTracking] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const watchIdRef = React.useRef<number | null>(null);
+
+  // Auto-start location tracking when rider picks up an order
+  useEffect(() => {
+    const activeDelivery = assignments.find((a: any) => a.status === 'picked_up');
+    if (activeDelivery && !isTracking) {
+      setCurrentOrderId(activeDelivery.order_id);
+      startLocationTracking(activeDelivery.order_id);
+    } else if (!activeDelivery && isTracking) {
+      stopLocationTracking();
+    }
+  }, [assignments]);
+
+  const startLocationTracking = (orderId: string) => {
+    if (!navigator.geolocation) {
+      console.error('Geolocation not supported');
+      return;
+    }
+
+    setIsTracking(true);
+    setCurrentOrderId(orderId);
+    
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async (position) => {
+        const location = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          timestamp: new Date().toISOString()
+        };
+
+        // Broadcast location to subscribers
+        await supabase.channel(`rider-location-${orderId}`).send({
+          type: 'broadcast',
+          event: 'location_update',
+          payload: location
+        });
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000
+      }
+    );
+  };
+
+  const stopLocationTracking = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+    setCurrentOrderId(null);
+  };
 
   const handleAccept = (assignmentId: string) => {
     acceptDelivery.mutate(assignmentId);
   };
 
-  const handlePickedUp = (assignmentId: string) => {
+  const handlePickedUp = (assignmentId: string, orderId: string) => {
     markPickedUp.mutate(assignmentId);
+    startLocationTracking(orderId);
   };
 
   const openCashDialog = (assignment: any) => {
@@ -63,6 +125,7 @@ const RiderDashboard: React.FC = () => {
         assignmentId: selectedAssignment.id, 
         cashAmount: parseFloat(cashAmount) 
       });
+      stopLocationTracking();
       setCashDialogOpen(false);
       setCashAmount('');
       setSelectedAssignment(null);
@@ -80,6 +143,7 @@ const RiderDashboard: React.FC = () => {
         assignmentId: selectedAssignment.id, 
         reason: failReason 
       });
+      stopLocationTracking();
       setFailDialogOpen(false);
       setFailReason('');
       setSelectedAssignment(null);
@@ -128,10 +192,18 @@ const RiderDashboard: React.FC = () => {
           </h1>
           <p className="text-muted-foreground">Welcome, {user?.name || 'Rider'}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-1" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isTracking && (
+            <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+              <Locate className="h-3 w-3 animate-pulse" />
+              Sharing Location
+            </Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -227,6 +299,17 @@ const RiderDashboard: React.FC = () => {
                   )}
                 </div>
 
+                {/* Live Map for picked up orders */}
+                {assignment.status === 'picked_up' && (
+                  <DeliveryTrackingMap
+                    orderId={assignment.order_id}
+                    riderId={user?.id || ''}
+                    deliveryAddress={assignment.delivery_address}
+                    pickupAddress={assignment.pickup_address}
+                    showRiderControls={true}
+                  />
+                )}
+
                 {/* Cash to Collect */}
                 <div className="bg-yellow-50 p-3 rounded-lg flex items-center justify-between">
                   <div>
@@ -257,7 +340,7 @@ const RiderDashboard: React.FC = () => {
                     <>
                       <Button 
                         className="flex-1"
-                        onClick={() => handlePickedUp(assignment.id)}
+                        onClick={() => handlePickedUp(assignment.id, assignment.order_id)}
                         disabled={markPickedUp.isPending}
                       >
                         <Package className="h-4 w-4 mr-1" />
