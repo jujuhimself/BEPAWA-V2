@@ -12,10 +12,7 @@ class InventoryMonitorService {
     try {
       const { data: product, error } = await supabase
         .from('products')
-        .select(`
-          *,
-          profiles!products_user_id_fkey(id, email, name)
-        `)
+        .select('id, name, stock, min_stock_level, user_id')
         .eq('id', productId)
         .single();
 
@@ -25,8 +22,14 @@ class InventoryMonitorService {
       }
 
       // Check if stock is below minimum threshold
-      if (product.stock <= product.min_stock_level) {
-        const owner = product.profiles;
+      const minStock = product.min_stock_level || 10;
+      if (product.stock <= minStock) {
+        // Get owner email
+        const { data: owner } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('id', product.user_id)
+          .single();
         
         if (owner?.id && owner?.email) {
           await comprehensiveNotificationService.notifyLowStock(
@@ -34,7 +37,7 @@ class InventoryMonitorService {
             owner.email,
             product.name,
             product.stock,
-            product.min_stock_level
+            minStock
           );
         }
       }
@@ -51,16 +54,16 @@ class InventoryMonitorService {
       const { data: products, error } = await supabase
         .from('products')
         .select('id, name, stock, min_stock_level')
-        .eq('user_id', userId)
-        .lte('stock', supabase.rpc('min_stock_level'));
+        .eq('user_id', userId);
 
       if (error) {
         console.error('Error fetching low stock products:', error);
         return;
       }
 
-      // Send alert for each low stock product
-      for (const product of products || []) {
+      // Filter low stock products and send alert for each
+      const lowStockProducts = (products || []).filter(p => p.stock <= (p.min_stock_level || 10));
+      for (const product of lowStockProducts) {
         await this.checkAndAlertLowStock(product.id);
       }
     } catch (error) {

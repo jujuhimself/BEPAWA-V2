@@ -60,8 +60,13 @@ const RetailStaffManagement = () => {
       if (error) throw error;
       
       // Transform data to match our interface
-      const transformedStaff = (data || []).map(member => ({
-        ...member,
+      const transformedStaff: StaffMember[] = (data || []).map(member => ({
+        id: member.id,
+        name: member.name,
+        email: member.email,
+        role: member.role as 'cashier' | 'manager' | 'pharmacist' | 'assistant',
+        is_active: member.is_active,
+        created_at: member.created_at,
         permissions: rolePermissions[member.role as keyof typeof rolePermissions] || []
       }));
       
