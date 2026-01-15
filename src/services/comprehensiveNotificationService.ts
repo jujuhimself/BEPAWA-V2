@@ -118,6 +118,142 @@ class ComprehensiveNotificationService {
   async notifyFeatureUpdate(userId: string, email: string, featureName: string, description: string): Promise<void> {
     await this.sendMultiChannel(userId, email, 'New Feature 🎉', `${featureName}: ${description}`, 'info', { category: 'feature_update' });
   }
+
+  // ==========================================
+  // COD / DELIVERY NOTIFICATIONS
+  // ==========================================
+
+  async notifyCODOrderPlaced(customerId: string, email: string, orderNumber: string, totalAmount: number, pharmacyName: string): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Order Placed! 🛒',
+      `Your order #${orderNumber} for TZS ${totalAmount.toLocaleString()} has been sent to ${pharmacyName}. Pay cash on delivery.`,
+      'success',
+      { category: 'cod_order', actionUrl: '/my-orders', actionLabel: 'Track Order' }
+    );
+  }
+
+  async notifyPharmacyCODOrder(pharmacyId: string, email: string, orderNumber: string, customerName: string, totalAmount: number): Promise<void> {
+    await this.sendMultiChannel(
+      pharmacyId,
+      email,
+      'New COD Order! 🛵',
+      `Order #${orderNumber} from ${customerName} for TZS ${totalAmount.toLocaleString()} requires confirmation.`,
+      'info',
+      { category: 'cod_order', priority: 'high', actionUrl: '/pharmacy', actionLabel: 'View Order' }
+    );
+  }
+
+  async notifyOrderAccepted(customerId: string, email: string, orderNumber: string, pharmacyName: string): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Order Accepted! ✅',
+      `Great news! ${pharmacyName} has accepted your order #${orderNumber} and is preparing it.`,
+      'success',
+      { category: 'cod_order', actionUrl: '/my-orders', actionLabel: 'Track Order' }
+    );
+  }
+
+  async notifyOrderRejected(customerId: string, email: string, orderNumber: string, reason: string): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Order Not Available ❌',
+      `Sorry, your order #${orderNumber} could not be fulfilled. Reason: ${reason}`,
+      'error',
+      { category: 'cod_order' }
+    );
+  }
+
+  async notifyOrderReadyForPickup(pharmacyId: string, email: string, orderNumber: string): Promise<void> {
+    await this.sendMultiChannel(
+      pharmacyId,
+      email,
+      'Order Ready for Pickup 📦',
+      `Order #${orderNumber} is packed and ready. Assign a rider for delivery.`,
+      'info',
+      { category: 'cod_order', actionUrl: '/pharmacy', actionLabel: 'Assign Rider' }
+    );
+  }
+
+  async notifyRiderAssigned(customerId: string, email: string, orderNumber: string, riderName: string, riderPhone: string): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Rider Assigned! 🏍️',
+      `${riderName} will deliver your order #${orderNumber}. Contact: ${riderPhone}`,
+      'info',
+      { category: 'delivery', actionUrl: '/my-orders', actionLabel: 'Track Delivery' }
+    );
+  }
+
+  async notifyRiderNewAssignment(riderId: string, email: string, orderNumber: string, pharmacyName: string, deliveryAddress: string, cashAmount: number): Promise<void> {
+    await this.sendMultiChannel(
+      riderId,
+      email,
+      'New Delivery Assignment! 📍',
+      `Pickup from ${pharmacyName}, deliver to ${deliveryAddress}. Cash to collect: TZS ${cashAmount.toLocaleString()}`,
+      'info',
+      { category: 'delivery', priority: 'high', actionUrl: '/rider', actionLabel: 'View Assignment' }
+    );
+  }
+
+  async notifyOrderPickedUp(customerId: string, email: string, orderNumber: string, riderName: string): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Order On The Way! 🚀',
+      `${riderName} has picked up your order #${orderNumber} and is heading to you!`,
+      'success',
+      { category: 'delivery', actionUrl: '/my-orders', actionLabel: 'Track Live' }
+    );
+  }
+
+  async notifyOrderDelivered(customerId: string, email: string, orderNumber: string, totalAmount: number): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Order Delivered! 🎉',
+      `Your order #${orderNumber} has been delivered. Thank you for shopping with us!`,
+      'success',
+      { category: 'delivery' }
+    );
+  }
+
+  async notifyPharmacyOrderDelivered(pharmacyId: string, email: string, orderNumber: string, cashAmount: number, riderName: string): Promise<void> {
+    await this.sendMultiChannel(
+      pharmacyId,
+      email,
+      'Order Delivered & Paid 💰',
+      `Order #${orderNumber} delivered by ${riderName}. Cash collected: TZS ${cashAmount.toLocaleString()}`,
+      'success',
+      { category: 'delivery' }
+    );
+  }
+
+  async notifyDeliveryFailed(customerId: string, email: string, orderNumber: string, reason: string): Promise<void> {
+    await this.sendMultiChannel(
+      customerId,
+      email,
+      'Delivery Issue ⚠️',
+      `We couldn't complete delivery for order #${orderNumber}. Reason: ${reason}. We'll contact you soon.`,
+      'warning',
+      { category: 'delivery' }
+    );
+  }
+
+  async notifyPharmacyDeliveryFailed(pharmacyId: string, email: string, orderNumber: string, reason: string, riderName: string): Promise<void> {
+    await this.sendMultiChannel(
+      pharmacyId,
+      email,
+      'Delivery Failed ❌',
+      `Order #${orderNumber} delivery failed by ${riderName}. Reason: ${reason}. Stock has been released.`,
+      'error',
+      { category: 'delivery', priority: 'high', actionUrl: '/pharmacy', actionLabel: 'View Order' }
+    );
+  }
 }
 
 export const comprehensiveNotificationService = new ComprehensiveNotificationService();

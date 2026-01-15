@@ -100,13 +100,31 @@ class DeliveryService {
       .eq('id', orderData.pharmacy_id)
       .single();
 
+    // Get customer info for notifications
+    const { data: customer } = await supabase
+      .from('profiles')
+      .select('email, name')
+      .eq('id', orderData.user_id)
+      .single();
+
     if (pharmacy) {
-      await comprehensiveNotificationService.notifyPharmacyNewOrder(
+      await comprehensiveNotificationService.notifyPharmacyCODOrder(
         orderData.pharmacy_id,
         pharmacy.email || '',
         orderNumber,
-        'Customer',
+        customer?.name || 'Customer',
         orderData.total_amount
+      );
+    }
+
+    // Notify customer their order was placed
+    if (customer) {
+      await comprehensiveNotificationService.notifyCODOrderPlaced(
+        orderData.user_id,
+        customer.email || '',
+        orderNumber,
+        orderData.total_amount,
+        pharmacy?.pharmacy_name || 'Pharmacy'
       );
     }
 
