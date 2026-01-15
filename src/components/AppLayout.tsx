@@ -10,10 +10,12 @@ interface AppLayoutProps {
 }
 
 const shouldShowNavbar = (pathname: string) => {
-  // Hide Navbar on dedicated shell/side-bar pages:
+  // Hide Navbar on dedicated shell/side-bar pages and delivery routes:
   return !(
     pathname.startsWith("/business-tools-retail") ||
-    pathname.startsWith("/wholesale/business-tools")
+    pathname.startsWith("/wholesale/business-tools") ||
+    pathname.startsWith("/delivery") ||
+    pathname.startsWith("/rider")
   );
 };
 

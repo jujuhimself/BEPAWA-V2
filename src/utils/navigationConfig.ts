@@ -97,6 +97,10 @@ export class NavigationMenuConfig {
         { label: "Subscription", icon: React.createElement(CreditCard, { className: "w-4 h-4" }), href: "/subscription" },
         { label: "Settings", icon: React.createElement(Settings, { className: "w-4 h-4" }), href: "/settings" },
       ],
+      delivery: [
+        { label: "My Deliveries", icon: React.createElement(Truck, { className: "w-4 h-4" }), href: "/delivery" },
+        { label: "Settings", icon: React.createElement(Settings, { className: "w-4 h-4" }), href: "/settings" },
+      ],
     };
   }
 
@@ -128,6 +132,7 @@ export class NavigationMenuConfig {
       "Results Management": "Lab Services",
       "Quality Control": "Lab Services",
       "POS": "General",
+      "My Deliveries": "General",
       "Settings": "Account",
     };
 

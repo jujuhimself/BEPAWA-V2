@@ -71,7 +71,8 @@ const PublicCatalog = () => {
         min_stock: product.min_stock_level || 0,
         wholesaler_name: product.branch?.name || 'Unknown Wholesaler',
         pharmacy_name: product.branch?.name || 'Unknown Pharmacy',
-        pharmacy_id: product.branch_id || product.pharmacy_id || ''
+        // Use branch_id, pharmacy_id, or fall back to user_id (the product owner/wholesaler)
+        pharmacy_id: product.branch_id || product.pharmacy_id || product.user_id || ''
       }));
 
       setProducts(transformedProducts);
