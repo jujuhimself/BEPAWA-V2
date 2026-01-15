@@ -83,7 +83,7 @@ const PharmacyAppointments = () => {
         notes: apt.notes || undefined,
         patient_name: '',
         patient_phone: '',
-        priority: apt.priority || undefined,
+        priority: apt.priority as 'urgent' | 'emergency' | undefined,
       }));
 
       setAppointments(typedAppointments);

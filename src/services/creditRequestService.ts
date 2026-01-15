@@ -103,7 +103,7 @@ class CreditRequestService {
 
     // Only return records with permitted status values and expected properties
     const filtered = data.filter(
-      (rec): rec is CreditRequest =>
+      (rec) =>
         isRecord(rec) &&
         typeof rec.status === "string" &&
         validStatuses.includes(rec.status as CreditRequest['status']) &&
@@ -123,7 +123,7 @@ class CreditRequestService {
         (typeof rec.review_notes === "string" || rec.review_notes === null)
     );
 
-    return filtered.map(rec => rec as CreditRequest);
+    return filtered as unknown as CreditRequest[];
   }
 
   async getCreditRequestsForWholesaler(wholesalerId: string): Promise<CreditRequest[]> {

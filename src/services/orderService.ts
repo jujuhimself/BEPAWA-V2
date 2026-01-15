@@ -157,10 +157,12 @@ class OrderService {
     // Send notification to order owner
     if (order && order.user_id) {
       try {
+        const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
+        const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
         const { comprehensiveNotificationService } = await import('./comprehensiveNotificationService');
         await comprehensiveNotificationService.notifyOrderStatusChange(
           order.user_id,
-          order.profiles?.email || '',
+          profileEmail || '',
           order.order_number,
           order.status,
           status
@@ -214,7 +216,7 @@ class OrderService {
       throw error;
     }
 
-    return data;
+    return data as PlatformOrder;
   }
 
   // New function to get platform revenue

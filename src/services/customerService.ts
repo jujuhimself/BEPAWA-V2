@@ -61,7 +61,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data || [];
+      return (data || []) as Customer[];
     } catch (error) {
       console.error('Error fetching customers:', error);
       throw error;
@@ -90,7 +90,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data;
+      return data as Customer | null;
     } catch (error) {
       console.error('Error adding customer:', error);
       throw error;
@@ -112,7 +112,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data;
+      return data as Customer | null;
     } catch (error) {
       console.error('Error updating customer:', error);
       throw error;
@@ -159,7 +159,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data || [];
+      return (data || []) as CustomerCommunication[];
     } catch (error) {
       console.error('Error fetching communications:', error);
       throw error;
@@ -186,7 +186,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data;
+      return data as CustomerCommunication | null;
     } catch (error) {
       console.error('Error adding communication:', error);
       throw error;
@@ -255,7 +255,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data || [];
+      return (data || []) as Customer[];
     } catch (error) {
       console.error('Error searching customers:', error);
       throw error;
@@ -277,7 +277,7 @@ class CustomerService {
         }
         throw error;
       }
-      return data;
+      return data as Customer | null;
     } catch (error) {
       console.error('Error fetching customer by ID:', error);
       throw error;
@@ -286,11 +286,20 @@ class CustomerService {
 
   async updateCustomerOrderStats(customerId: string, orderAmount: number): Promise<boolean> {
     try {
+      // First get current values
+      const { data: customer, error: fetchError } = await supabase
+        .from('customers')
+        .select('total_orders, total_spent')
+        .eq('id', customerId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       const { error } = await supabase
         .from('customers')
         .update({
-          total_orders: supabase.rpc('increment', { n: 1 }),
-          total_spent: supabase.rpc('increment', { n: orderAmount }),
+          total_orders: (customer?.total_orders || 0) + 1,
+          total_spent: (customer?.total_spent || 0) + orderAmount,
           last_order_date: new Date().toISOString().split('T')[0]
         })
         .eq('id', customerId);

@@ -164,7 +164,7 @@ class PrescriptionService {
         console.error('Error fetching shared prescription details:', sharedPrescError);
         throw sharedPrescError;
       }
-      shared = sharedPrescriptions || [];
+      shared = (sharedPrescriptions || []) as Prescription[];
     }
     // Map assigned and shared to ensure status is typed
     const assignedTyped = (assigned || []).map(prescription => ({

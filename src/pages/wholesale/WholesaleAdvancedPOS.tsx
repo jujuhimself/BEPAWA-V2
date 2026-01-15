@@ -58,12 +58,12 @@ const WholesaleAdvancedPOS = () => {
     try {
       const { data, error } = await supabase
         .from('branches')
-        .select('*')
-        .eq('user_id', user.id)
+        .select('id, name, code, vat_rate, wht_rate')
+        .eq('parent_id', user.id)
         .eq('is_active', true);
 
       if (error) throw error;
-      setBranches(data || []);
+      setBranches((data || []) as Branch[]);
       if (data && data.length > 0) {
         setSelectedBranch(data[0].id);
       }

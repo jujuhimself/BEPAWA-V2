@@ -138,7 +138,8 @@ class DeliveryService {
     if (orderError || !order) throw new Error('Order not found');
 
     // Reserve stock for the order items
-    const items = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
+    const itemsData = order.items;
+    const items = Array.isArray(itemsData) ? itemsData : JSON.parse(String(itemsData) || '[]');
     await this.reserveStock(orderId, items);
 
     // Update order status
@@ -162,9 +163,11 @@ class DeliveryService {
 
     // Notify customer
     if (order.user_id) {
+      const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
+      const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
       await comprehensiveNotificationService.notifyOrderStatusChange(
         order.user_id,
-        order.profiles?.email || '',
+        profileEmail || '',
         order.order_number,
         COD_ORDER_STATUSES.PENDING_PHARMACY_CONFIRMATION,
         COD_ORDER_STATUSES.PREPARING_ORDER
@@ -203,9 +206,11 @@ class DeliveryService {
     });
 
     if (order?.user_id) {
+      const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
+      const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
       await comprehensiveNotificationService.notifyOrderStatusChange(
         order.user_id,
-        order.profiles?.email || '',
+        profileEmail || '',
         order.order_number,
         order.status,
         COD_ORDER_STATUSES.CANCELLED
@@ -323,7 +328,7 @@ class DeliveryService {
       rider_id: riderId 
     });
 
-    return assignment;
+    return assignment as DeliveryAssignment;
   }
 
   async getAvailableRiders(): Promise<any[]> {
@@ -362,7 +367,7 @@ class DeliveryService {
       throw error;
     }
 
-    return data || [];
+    return (data || []) as DeliveryAssignment[];
   }
 
   async acceptDeliveryAssignment(assignmentId: string): Promise<void> {
@@ -491,9 +496,11 @@ class DeliveryService {
       .single();
 
     if (order?.user_id) {
+      const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
+      const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
       await comprehensiveNotificationService.notifyOrderStatusChange(
         order.user_id,
-        order.profiles?.email || '',
+        profileEmail || '',
         order.order_number,
         COD_ORDER_STATUSES.OUT_FOR_DELIVERY,
         COD_ORDER_STATUSES.DELIVERED_AND_PAID
@@ -609,7 +616,8 @@ class DeliveryService {
 
     if (!order) return;
 
-    const items = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
+    const itemsData = order.items;
+    const items = Array.isArray(itemsData) ? itemsData : JSON.parse(String(itemsData) || '[]');
 
     // Create POS sale
     const { data: sale, error: saleError } = await supabase

@@ -72,8 +72,8 @@ const WholesaleInventoryAdjustments = () => {
     try {
       const { data, error } = await supabase
         .from('branches')
-        .select('*')
-        .eq('user_id', user.id)
+        .select('id, name, code')
+        .eq('parent_id', user.id)
         .eq('is_active', true);
 
       if (error) throw error;
