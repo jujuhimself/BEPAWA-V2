@@ -24,9 +24,10 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ['react', 'react-dom'],
+    dedupe: ['react', 'react-dom', 'react-router-dom'],
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', '@radix-ui/react-tooltip'],
+    include: ['react', 'react-dom', 'react-router-dom', '@radix-ui/react-tooltip', '@tanstack/react-query'],
+    force: true,
   },
 }));
