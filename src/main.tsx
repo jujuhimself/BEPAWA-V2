@@ -5,17 +5,24 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
 
-// Register service worker for PWA functionality with error handling
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+// Register service worker for PWA functionality.
+// IMPORTANT: In development/preview, a service worker can cache old JS chunks and cause
+// hard-to-debug runtime errors (including React hooks dispatcher issues).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
       .then((registration) => {
-        console.log('SW registered: ', registration);
+        console.log("SW registered: ", registration);
       })
       .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-        // Don't let SW registration failure break the app
+        console.log("SW registration failed: ", registrationError);
       });
+  });
+} else if (import.meta.env.DEV && "serviceWorker" in navigator) {
+  // Ensure no SW is controlling the dev preview.
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((r) => r.unregister());
   });
 }
 
