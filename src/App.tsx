@@ -8,26 +8,29 @@ import Navbar from "@/components/Navbar";
 import AppRoutes from "./routes/AppRoutes";
 import ChatBot from "@/components/ChatBot";
 import { SubscriptionInit } from "@/components/subscription/SubscriptionInit";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BranchProvider>
-          <SubscriptionInit>
-            <div className="min-h-screen bg-gray-50">
-              <Navbar />
-              <AppRoutes />
-              <ChatBot />
-            </div>
-          </SubscriptionInit>
-        </BranchProvider>
-      </AuthProvider>
-    </TooltipProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <BranchProvider>
+            <SubscriptionInit>
+              <div className="min-h-screen bg-background text-foreground">
+                <Navbar />
+                <AppRoutes />
+                <ChatBot />
+              </div>
+            </SubscriptionInit>
+          </BranchProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
