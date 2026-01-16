@@ -160,8 +160,26 @@ const Cart = () => {
       return;
     }
 
-    // Get the pharmacy_id from cart items (assuming all items are from same pharmacy)
-    const pharmacyId = cartItems[0]?.pharmacy_id;
+    // Get the pharmacy_id from cart items - try pharmacy_id first, then look up from product
+    let pharmacyId = cartItems[0]?.pharmacy_id;
+    
+    // If pharmacy_id is empty, try to fetch it from the product's user_id (the seller)
+    if (!pharmacyId && cartItems[0]?.id) {
+      try {
+        const { data: productData } = await supabase
+          .from('products')
+          .select('user_id, branch_id')
+          .eq('id', cartItems[0].id)
+          .single();
+        
+        if (productData) {
+          pharmacyId = productData.branch_id || productData.user_id;
+        }
+      } catch (err) {
+        console.error('Error fetching product pharmacy:', err);
+      }
+    }
+    
     if (!pharmacyId) {
       toast({ 
         title: 'Error', 
