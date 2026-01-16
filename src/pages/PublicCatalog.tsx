@@ -37,7 +37,7 @@ const PublicCatalog = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true);
-      // First fetch the products with minimal branch info
+      // Fetch products with branch info
       let productsQuery = supabase
         .from('products')
         .select('*, branch:branches(id, name, address)')
@@ -65,15 +65,39 @@ const PublicCatalog = () => {
         throw error;
       }
 
-      const transformedProducts = (productsData || []).map((product: any) => ({
-        ...product,
-        price: product.sell_price || 0,
-        min_stock: product.min_stock_level || 0,
-        wholesaler_name: product.branch?.name || 'Unknown Wholesaler',
-        pharmacy_name: product.branch?.name || 'Unknown Pharmacy',
-        // Use branch_id, pharmacy_id, or fall back to user_id (the product owner/wholesaler)
-        pharmacy_id: product.branch_id || product.pharmacy_id || product.user_id || ''
-      }));
+      // Get unique user_ids to fetch owner profiles
+      const userIds = [...new Set((productsData || []).map((p: any) => p.user_id).filter(Boolean))] as string[];
+      
+      // Fetch owner profiles for pharmacy names
+      let profilesMap: Record<string, any> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, pharmacy_name, business_name, name')
+          .in('id', userIds);
+        
+        profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
+          acc[p.id] = p;
+          return acc;
+        }, {});
+      }
+
+      const transformedProducts = (productsData || []).map((product: any) => {
+        // Get pharmacy/wholesaler name from owner profile or branch
+        const owner = profilesMap[product.user_id];
+        const ownerName = owner?.pharmacy_name || owner?.business_name || owner?.name;
+        const branchName = product.branch?.name;
+        const displayName = ownerName || branchName || 'Local Pharmacy';
+        
+        return {
+          ...product,
+          price: product.sell_price || 0,
+          min_stock: product.min_stock_level || 0,
+          wholesaler_name: displayName,
+          pharmacy_name: displayName,
+          pharmacy_id: product.branch_id || product.pharmacy_id || product.user_id || ''
+        };
+      });
 
       setProducts(transformedProducts);
       setFilteredProducts(transformedProducts);
