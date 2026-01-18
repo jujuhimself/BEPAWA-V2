@@ -163,8 +163,8 @@ const PharmacyCODOrders: React.FC = () => {
 
                   {/* Rider Info (if assigned) */}
                   {order.rider && (
-                    <div className="flex items-center gap-2 text-sm bg-indigo-50 p-2 rounded">
-                      <User className="h-4 w-4 text-indigo-600" />
+                    <div className="flex items-center gap-2 text-sm bg-indigo-50 dark:bg-indigo-950/50 p-2 rounded">
+                      <User className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                       <span>Rider: {order.rider.name}</span>
                       <span className="text-muted-foreground">({order.rider.phone})</span>
                     </div>
