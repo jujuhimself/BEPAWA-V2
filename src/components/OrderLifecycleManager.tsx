@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,13 @@ const OrderLifecycleManager = ({ order, onStatusUpdate }: OrderLifecycleManagerP
 
   const statusOptions = [
     { value: 'pending', label: 'Pending', color: 'bg-yellow-500' },
+    { value: 'pending_pharmacy_confirmation', label: 'Pending Confirmation', color: 'bg-yellow-500' },
+    { value: 'preparing_order', label: 'Preparing', color: 'bg-blue-500' },
+    { value: 'awaiting_rider', label: 'Awaiting Rider', color: 'bg-purple-500' },
+    { value: 'rider_assigned', label: 'Rider Assigned', color: 'bg-indigo-500' },
+    { value: 'out_for_delivery', label: 'Out for Delivery', color: 'bg-orange-500' },
+    { value: 'delivered_and_paid', label: 'Delivered & Paid', color: 'bg-green-500' },
+    { value: 'delivery_failed', label: 'Delivery Failed', color: 'bg-red-500' },
     { value: 'confirmed', label: 'Confirmed', color: 'bg-blue-500' },
     { value: 'packed', label: 'Packed', color: 'bg-purple-500' },
     { value: 'shipped', label: 'Shipped', color: 'bg-orange-500' },
@@ -60,9 +67,16 @@ const OrderLifecycleManager = ({ order, onStatusUpdate }: OrderLifecycleManagerP
     { value: 'cancelled', label: 'Cancelled', color: 'bg-red-500' }
   ];
 
-  const getStatusProgress = (status: Order['status']) => {
-    const progressMap = {
+  const getStatusProgress = (status: string): number => {
+    const progressMap: Record<string, number> = {
       'pending': 10,
+      'pending_pharmacy_confirmation': 10,
+      'preparing_order': 25,
+      'awaiting_rider': 40,
+      'rider_assigned': 55,
+      'out_for_delivery': 75,
+      'delivered_and_paid': 100,
+      'delivery_failed': 0,
       'confirmed': 25,
       'packed': 50,
       'shipped': 70,
@@ -70,12 +84,19 @@ const OrderLifecycleManager = ({ order, onStatusUpdate }: OrderLifecycleManagerP
       'delivered': 100,
       'cancelled': 0
     };
-    return progressMap[status];
+    return progressMap[status] ?? 10;
   };
 
-  const getStatusIcon = (status: Order['status']) => {
-    const iconMap = {
+  const getStatusIcon = (status: string): React.ComponentType<{ className?: string }> => {
+    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
       'pending': Clock,
+      'pending_pharmacy_confirmation': Clock,
+      'preparing_order': Package,
+      'awaiting_rider': Clock,
+      'rider_assigned': Truck,
+      'out_for_delivery': Truck,
+      'delivered_and_paid': CheckCircle,
+      'delivery_failed': AlertTriangle,
       'confirmed': CheckCircle,
       'packed': Package,
       'shipped': Truck,
@@ -83,7 +104,7 @@ const OrderLifecycleManager = ({ order, onStatusUpdate }: OrderLifecycleManagerP
       'delivered': CheckCircle,
       'cancelled': AlertTriangle
     };
-    return iconMap[status];
+    return iconMap[status] ?? Package;
   };
 
   // Remove mock update and use callback only
