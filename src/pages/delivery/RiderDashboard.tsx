@@ -170,7 +170,7 @@ const RiderDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen bg-background p-4">
         <Card>
           <CardContent className="p-8 text-center">
             <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
@@ -182,7 +182,7 @@ const RiderDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 space-y-4">
+    <div className="min-h-screen bg-background p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -208,28 +208,28 @@ const RiderDashboard: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-yellow-50 border-yellow-200">
+        <Card className="bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800">
           <CardContent className="p-3 text-center">
-            <p className="text-2xl font-bold text-yellow-700">
+            <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
               {assignments.filter((a: any) => a.status === 'assigned').length}
             </p>
-            <p className="text-xs text-yellow-600">Pending</p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500">Pending</p>
           </CardContent>
         </Card>
-        <Card className="bg-blue-50 border-blue-200">
+        <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
           <CardContent className="p-3 text-center">
-            <p className="text-2xl font-bold text-blue-700">
+            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
               {assignments.filter((a: any) => a.status === 'accepted').length}
             </p>
-            <p className="text-xs text-blue-600">To Pickup</p>
+            <p className="text-xs text-blue-600 dark:text-blue-500">To Pickup</p>
           </CardContent>
         </Card>
-        <Card className="bg-orange-50 border-orange-200">
+        <Card className="bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800">
           <CardContent className="p-3 text-center">
-            <p className="text-2xl font-bold text-orange-700">
+            <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">
               {assignments.filter((a: any) => a.status === 'picked_up').length}
             </p>
-            <p className="text-xs text-orange-600">Delivering</p>
+            <p className="text-xs text-orange-600 dark:text-orange-500">Delivering</p>
           </CardContent>
         </Card>
       </div>
@@ -263,9 +263,9 @@ const RiderDashboard: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
                 {/* Pharmacy Info */}
-                <div className="bg-blue-50 p-3 rounded-lg">
+                <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg">
                   <p className="text-sm font-medium flex items-center gap-1 mb-1">
-                    <Store className="h-4 w-4 text-blue-600" />
+                    <Store className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     Pickup Location
                   </p>
                   <p className="text-sm">{assignment.pharmacy?.pharmacy_name}</p>
@@ -273,7 +273,7 @@ const RiderDashboard: React.FC = () => {
                   {assignment.pharmacy?.phone && (
                     <a 
                       href={`tel:${assignment.pharmacy.phone}`}
-                      className="text-sm text-blue-600 flex items-center gap-1 mt-1"
+                      className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-1 mt-1"
                     >
                       <Phone className="h-3 w-3" />
                       {assignment.pharmacy.phone}
@@ -282,16 +282,16 @@ const RiderDashboard: React.FC = () => {
                 </div>
 
                 {/* Customer Info */}
-                <div className="bg-green-50 p-3 rounded-lg">
+                <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg">
                   <p className="text-sm font-medium flex items-center gap-1 mb-1">
-                    <MapPin className="h-4 w-4 text-green-600" />
+                    <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
                     Delivery Location
                   </p>
                   <p className="text-sm">{assignment.delivery_address}</p>
                   {assignment.customer_phone && (
                     <a 
                       href={`tel:${assignment.customer_phone}`}
-                      className="text-sm text-green-600 flex items-center gap-1 mt-1"
+                      className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1 mt-1"
                     >
                       <Phone className="h-3 w-3" />
                       {assignment.customer_phone}
@@ -311,14 +311,14 @@ const RiderDashboard: React.FC = () => {
                 )}
 
                 {/* Cash to Collect */}
-                <div className="bg-yellow-50 p-3 rounded-lg flex items-center justify-between">
+                <div className="bg-yellow-50 dark:bg-yellow-950/30 p-3 rounded-lg flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium flex items-center gap-1">
-                      <DollarSign className="h-4 w-4 text-yellow-600" />
+                      <DollarSign className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                       Cash to Collect
                     </p>
                   </div>
-                  <p className="text-xl font-bold text-yellow-700">
+                  <p className="text-xl font-bold text-yellow-700 dark:text-yellow-400">
                     TZS {assignment.cash_amount?.toLocaleString()}
                   </p>
                 </div>
@@ -410,9 +410,9 @@ const RiderDashboard: React.FC = () => {
                 className="mt-1"
               />
             </div>
-            <div className="bg-yellow-50 p-3 rounded-lg flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-yellow-700">
+            <div className="bg-yellow-50 dark:bg-yellow-950/30 p-3 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
                 Make sure you have collected the full payment before confirming.
                 This will finalize the order.
               </p>

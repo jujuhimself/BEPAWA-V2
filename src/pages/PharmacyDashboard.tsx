@@ -117,10 +117,10 @@ export default function PharmacyDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-96">
-            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-lg">Loading your dashboard...</span>
           </div>
         </div>
@@ -130,11 +130,11 @@ export default function PharmacyDashboard() {
 
   if (isError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col items-center justify-center min-h-96">
-            <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
-            <div className="text-red-600 text-lg mb-4">Error loading dashboard: {(error as Error)?.message || "An unknown error occurred."}</div>
+            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+            <div className="text-destructive text-lg mb-4">Error loading dashboard: {(error as Error)?.message || "An unknown error occurred."}</div>
             <Button onClick={() => refetch()}>
               Retry
             </Button>
@@ -146,17 +146,17 @@ export default function PharmacyDashboard() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+      <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           <BreadcrumbNavigation />
           
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                <h1 className="text-4xl font-bold text-foreground mb-2">
                   Welcome back, {user?.pharmacyName}
                 </h1>
-                <p className="text-gray-600 text-lg">Manage your orders and browse our medical product catalog</p>
+                <p className="text-muted-foreground text-lg">Manage your orders and browse our medical product catalog</p>
               </div>
             </div>
           </div>

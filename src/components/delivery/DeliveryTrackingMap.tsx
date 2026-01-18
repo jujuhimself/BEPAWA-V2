@@ -217,11 +217,11 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
           {/* Fallback tracking info */}
           <div className="space-y-3">
             {pickupAddress && (
-              <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-blue-600" />
+                      <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       Pickup Location
                     </p>
                     <p className="text-sm text-muted-foreground">{pickupAddress}</p>
@@ -238,11 +238,11 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             )}
             
             {deliveryAddress && (
-              <div className="bg-green-50 p-3 rounded-lg">
+              <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-green-600" />
+                      <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
                       Delivery Location
                     </p>
                     <p className="text-sm text-muted-foreground">{deliveryAddress}</p>
@@ -259,14 +259,14 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             )}
 
             {riderLocation && (
-              <div className="bg-orange-50 p-3 rounded-lg flex items-center justify-between">
+              <div className="bg-orange-50 dark:bg-orange-950/30 p-3 rounded-lg flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">Rider Location</p>
                   <p className="text-xs text-muted-foreground">
                     Last updated: {new Date(riderLocation.timestamp).toLocaleTimeString()}
                   </p>
                 </div>
-                <Badge variant="outline" className="bg-white">
+                <Badge variant="outline" className="bg-background">
                   {riderLocation.latitude.toFixed(4)}, {riderLocation.longitude.toFixed(4)}
                 </Badge>
               </div>
