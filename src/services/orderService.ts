@@ -133,12 +133,23 @@ class OrderService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    // Get order details for notification
+    // Get order details (without FK join - no FK exists)
     const { data: order } = await supabase
       .from('orders')
-      .select('*, profiles!orders_user_id_fkey(email)')
+      .select('*')
       .eq('id', orderId)
       .single();
+
+    // Get customer email separately if needed
+    let customerEmail = '';
+    if (order?.user_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', order.user_id)
+        .single();
+      customerEmail = profile?.email || '';
+    }
 
     const { error } = await supabase
       .from('order_status_history')
@@ -157,12 +168,10 @@ class OrderService {
     // Send notification to order owner
     if (order && order.user_id) {
       try {
-        const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
-        const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
         const { comprehensiveNotificationService } = await import('./comprehensiveNotificationService');
         await comprehensiveNotificationService.notifyOrderStatusChange(
           order.user_id,
-          profileEmail || '',
+          customerEmail,
           order.order_number,
           order.status,
           status
