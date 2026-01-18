@@ -4,17 +4,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, Clock, Search, Filter, Download, Eye, Plus, AlertTriangle } from "lucide-react";
+import { Package, Clock, Search, Download, Eye, Plus, AlertTriangle, MapPin, Phone, User, Truck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import OrderLifecycleManager from "@/components/OrderLifecycleManager";
+import CODOrderManager from "@/components/pharmacy/CODOrderManager";
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { deliveryService } from '@/services/deliveryService';
 
-// Update minimal Order fallback type to match OrderLifecycleManager needs
+// Update minimal Order fallback type to include COD fields
 type Order = {
   id: string;
+  order_number?: string;
   status: string;
   pharmacyName: string;
   createdAt: string;
@@ -23,14 +27,20 @@ type Order = {
     sku?: string;
     quantity: number;
     price: number;
-  }>; // <-- items must match shape required by OrderLifecycleManager
+  }>;
   total: number;
   paymentStatus: string;
   paymentMethod: string;
   updatedAt: string;
   urgency?: string;
   trackingNumber?: string;
-  shippingAddress: string; // <-- Required for type compatibility with OrderLifecycleManager
+  shippingAddress: string;
+  delivery_address?: string;
+  delivery_phone?: string;
+  rider?: any;
+  customer?: any;
+  // Raw order data for COD manager
+  rawOrder?: any;
 };
 
 const Orders = () => {
@@ -40,35 +50,41 @@ const Orders = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const [viewOrderDialog, setViewOrderDialog] = useState(false);
+  const [selectedViewOrder, setSelectedViewOrder] = useState<Order | null>(null);
 
-  useEffect(() => {
-    if (!user || user.role !== 'retail') {
-      navigate('/login');
+  const fetchOrders = async () => {
+    if (!user) return;
+    
+    const { data: ordersData, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        customer:profiles!orders_user_id_fkey(id, name, phone, address),
+        rider:profiles!orders_rider_id_fkey(id, name, phone)
+      `)
+      .eq('pharmacy_id', user.id)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      setOrders([]);
       return;
     }
-
-    // Fetch real orders for this pharmacy
-    (async () => {
-      const { data: ordersData, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('pharmacy_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) {
-        setOrders([]);
-        return;
-      }
-      // Map to UI Order type
-      setOrders((ordersData || []).map((order: any) => ({
+    
+    // Map to UI Order type
+    setOrders((ordersData || []).map((order: any) => {
+      const items = Array.isArray(order.items) ? order.items : [];
+      return {
         id: order.id,
+        order_number: order.order_number,
         status: order.status,
         pharmacyName: order.pharmacy_name || user.pharmacyName || '',
         createdAt: order.created_at,
-        items: (order.items || []).map((item: any) => ({
+        items: items.map((item: any) => ({
           name: item.product_name || item.name || '',
           sku: item.sku,
           quantity: item.quantity,
-          price: item.unit_price || item.price || 0,
+          price: item.unit_price || item.price || item.sell_price || 0,
         })),
         total: order.total_amount || 0,
         paymentStatus: order.payment_status,
@@ -76,9 +92,22 @@ const Orders = () => {
         updatedAt: order.updated_at,
         urgency: order.urgency,
         trackingNumber: order.tracking_number,
-        shippingAddress: order.shipping_address?.address || '',
-      })));
-    })();
+        shippingAddress: order.shipping_address?.address || order.delivery_address || '',
+        delivery_address: order.delivery_address,
+        delivery_phone: order.delivery_phone,
+        rider: order.rider,
+        customer: order.customer,
+        rawOrder: order,
+      };
+    }));
+  };
+
+  useEffect(() => {
+    if (!user || user.role !== 'retail') {
+      navigate('/login');
+      return;
+    }
+    fetchOrders();
   }, [user, navigate]);
 
   const handleOrderStatusUpdate = (orderId: string, newStatus: Order['status']) => {
@@ -117,16 +146,23 @@ const Orders = () => {
   });
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-500 text-white';
-      case 'confirmed': return 'bg-blue-500 text-white';
-      case 'packed': return 'bg-purple-500 text-white';
-      case 'shipped': return 'bg-orange-500 text-white';
-      case 'out-for-delivery': return 'bg-indigo-500 text-white';
-      case 'delivered': return 'bg-green-500 text-white';
-      case 'cancelled': return 'bg-red-500 text-white';
-      default: return 'bg-gray-500 text-white';
-    }
+    const colorMap: Record<string, string> = {
+      'pending': 'bg-yellow-500 text-white',
+      'pending_pharmacy_confirmation': 'bg-yellow-500 text-white',
+      'preparing_order': 'bg-blue-500 text-white',
+      'awaiting_rider': 'bg-purple-500 text-white',
+      'rider_assigned': 'bg-indigo-500 text-white',
+      'out_for_delivery': 'bg-orange-500 text-white',
+      'delivered_and_paid': 'bg-green-500 text-white',
+      'delivery_failed': 'bg-red-500 text-white',
+      'confirmed': 'bg-blue-500 text-white',
+      'packed': 'bg-purple-500 text-white',
+      'shipped': 'bg-orange-500 text-white',
+      'out-for-delivery': 'bg-indigo-500 text-white',
+      'delivered': 'bg-green-500 text-white',
+      'cancelled': 'bg-red-500 text-white',
+    };
+    return colorMap[status] || 'bg-gray-500 text-white';
   };
 
   const getPaymentStatusColor = (status: string) => {
@@ -166,13 +202,13 @@ const Orders = () => {
     order.items.some(item => (item.name || '').toLowerCase().includes('hiv self-test kit'));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+    <div className="min-h-screen bg-background">
       {/* Navbar removed to avoid duplicate menu */}
       
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Order Management</h1>
-          <p className="text-gray-600 text-lg">Track and manage all your pharmacy orders</p>
+          <h1 className="text-4xl font-bold text-foreground mb-2">Order Management</h1>
+          <p className="text-muted-foreground text-lg">Track and manage all your pharmacy orders</p>
         </div>
 
         {/* Enhanced Stats Cards */}
@@ -323,16 +359,19 @@ const Orders = () => {
                   ) : (
                     <div className="space-y-4">
                       {getTabOrders(tab).map((order) => (
-                        <div key={order.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div key={order.id} className="border rounded-lg p-6 hover:shadow-md transition-shadow bg-card">
                           <div className="flex justify-between items-start mb-4">
                             <div className="flex items-start gap-3">
-                              <div className="p-3 bg-blue-100 rounded-lg">
-                                <Package className="h-6 w-6 text-blue-600" />
+                              <div className="p-3 bg-blue-100 dark:bg-blue-950/50 rounded-lg">
+                                <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="font-semibold text-lg flex items-center gap-2">
-                                    Order #{order.id}
+                                    Order #{order.order_number || order.id.slice(0,8)}
+                                    {order.paymentMethod?.toLowerCase() === 'cod' && (
+                                      <Badge className="bg-orange-500 text-white text-xs">COD</Badge>
+                                    )}
                                     {isHivKitOrder(order) && (
                                       <span className="inline-block bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded">HIV Kit</span>
                                     )}
@@ -344,60 +383,96 @@ const Orders = () => {
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-gray-600 mb-1">{order.pharmacyName}</p>
-                                <p className="text-sm text-gray-500">
-                                  {order.items.length} items • Created: {new Date(order.createdAt).toLocaleDateString()}
+                                <p className="text-muted-foreground mb-1">{order.pharmacyName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {order.items.length} items • Created: {format(new Date(order.createdAt), 'PP')}
                                 </p>
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-2xl font-bold text-green-600 mb-1">
+                              <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
                                 TZS {order.total.toLocaleString()}
                               </div>
-                              <p className="text-sm text-gray-500">Total Amount</p>
+                              <p className="text-sm text-muted-foreground">Total Amount</p>
                             </div>
                           </div>
 
                           <div className="grid md:grid-cols-4 gap-4 mb-4">
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">Order Status</p>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Order Status</p>
                               <Badge className={getStatusColor(order.status)}>
-                                {order.status.replace('-', ' ').toUpperCase()}
+                                {deliveryService.getStatusLabel(order.status)}
                               </Badge>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">Payment Status</p>
-                              <Badge className={getPaymentStatusColor(order.paymentStatus)}>
-                                {order.paymentStatus.toUpperCase()}
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Payment Status</p>
+                              <Badge className={getPaymentStatusColor(order.paymentStatus || 'pending')}>
+                                {(order.paymentStatus || 'pending').toUpperCase()}
                               </Badge>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">Payment Method</p>
-                              <p className="font-medium">{order.paymentMethod.toUpperCase()}</p>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Payment Method</p>
+                              <p className="font-medium">{(order.paymentMethod || 'N/A').toUpperCase()}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">Last Updated</p>
-                              <p className="font-medium">{new Date(order.updatedAt).toLocaleDateString()}</p>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Updated</p>
+                              <p className="font-medium">{format(new Date(order.updatedAt), 'PP')}</p>
                             </div>
                           </div>
 
                           <div className="flex justify-between items-center">
-                            <div className="text-sm text-gray-600">
+                            <div className="text-sm text-muted-foreground">
                               <p><strong>Items:</strong> {order.items.map(item => item.name).join(', ')}</p>
                               {order.trackingNumber && (
                                 <p><strong>Tracking:</strong> {order.trackingNumber}</p>
                               )}
+                              {order.delivery_address && (
+                                <p className="flex items-center gap-1 mt-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {order.delivery_address}
+                                </p>
+                              )}
                             </div>
                             
                             <div className="flex gap-2">
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedViewOrder(order);
+                                  setViewOrderDialog(true);
+                                }}
+                              >
                                 <Eye className="h-4 w-4 mr-1" />
                                 View Details
                               </Button>
-                              <OrderLifecycleManager 
-                                order={order} 
-                                onStatusUpdate={handleOrderStatusUpdate}
-                              />
+                              {order.paymentMethod?.toLowerCase() === 'cod' ? (
+                                <CODOrderManager 
+                                  order={{
+                                    id: order.id,
+                                    order_number: order.order_number,
+                                    status: order.status,
+                                    total_amount: order.total,
+                                    payment_method: order.paymentMethod,
+                                    payment_status: order.paymentStatus,
+                                    delivery_address: order.delivery_address,
+                                    delivery_phone: order.delivery_phone,
+                                    created_at: order.createdAt,
+                                    items: order.items,
+                                    rider: order.rider,
+                                    customer: order.customer,
+                                  }}
+                                  onStatusUpdate={(orderId, newStatus) => {
+                                    handleOrderStatusUpdate(orderId, newStatus);
+                                    fetchOrders(); // Refresh orders
+                                  }}
+                                />
+                              ) : (
+                                <OrderLifecycleManager 
+                                  order={order} 
+                                  onStatusUpdate={handleOrderStatusUpdate}
+                                />
+                              )}
                             </div>
                           </div>
                         </div>
@@ -409,6 +484,108 @@ const Orders = () => {
             </TabsContent>
           ))}
         </Tabs>
+
+        {/* View Order Details Dialog */}
+        <Dialog open={viewOrderDialog} onOpenChange={setViewOrderDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Order Details</DialogTitle>
+            </DialogHeader>
+            {selectedViewOrder && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Order ID</p>
+                    <p className="font-medium">{selectedViewOrder.order_number || selectedViewOrder.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <Badge className={getStatusColor(selectedViewOrder.status)}>
+                      {deliveryService.getStatusLabel(selectedViewOrder.status)}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total</p>
+                    <p className="font-bold text-lg">TZS {selectedViewOrder.total.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment</p>
+                    <Badge className={getPaymentStatusColor(selectedViewOrder.paymentStatus)}>
+                      {selectedViewOrder.paymentMethod?.toUpperCase()} - {selectedViewOrder.paymentStatus?.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Created</p>
+                    <p className="font-medium">{format(new Date(selectedViewOrder.createdAt), 'PPp')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Updated</p>
+                    <p className="font-medium">{format(new Date(selectedViewOrder.updatedAt), 'PPp')}</p>
+                  </div>
+                </div>
+
+                {(selectedViewOrder.delivery_address || selectedViewOrder.delivery_phone) && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Truck className="h-4 w-4" />
+                        Delivery Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {selectedViewOrder.delivery_address && (
+                        <p className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          {selectedViewOrder.delivery_address}
+                        </p>
+                      )}
+                      {selectedViewOrder.delivery_phone && (
+                        <p className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          {selectedViewOrder.delivery_phone}
+                        </p>
+                      )}
+                      {selectedViewOrder.customer && (
+                        <p className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {selectedViewOrder.customer.name}
+                        </p>
+                      )}
+                      {selectedViewOrder.rider && (
+                        <div className="bg-indigo-50 dark:bg-indigo-950/50 p-2 rounded mt-2">
+                          <p className="text-sm font-medium">Assigned Rider:</p>
+                          <p>{selectedViewOrder.rider.name} - {selectedViewOrder.rider.phone}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Order Items ({selectedViewOrder.items.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {selectedViewOrder.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            {item.sku && <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>}
+                          </div>
+                          <div className="text-right">
+                            <p>x{item.quantity}</p>
+                            <p className="text-sm text-muted-foreground">TZS {(item.price * item.quantity).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
