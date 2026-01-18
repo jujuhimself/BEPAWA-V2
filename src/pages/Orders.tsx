@@ -56,24 +56,44 @@ const Orders = () => {
   const fetchOrders = async () => {
     if (!user) return;
     
+    // Fetch orders without FK joins (no foreign keys exist on orders table)
     const { data: ordersData, error } = await supabase
       .from('orders')
-      .select(`
-        *,
-        customer:profiles!orders_user_id_fkey(id, name, phone, address),
-        rider:profiles!orders_rider_id_fkey(id, name, phone)
-      `)
+      .select('*')
       .eq('pharmacy_id', user.id)
+      .neq('status', 'cart')
       .order('created_at', { ascending: false });
       
     if (error) {
+      console.error('Error fetching orders:', error);
       setOrders([]);
       return;
+    }
+
+    // Fetch related profiles for customer and rider data
+    const userIds = [...new Set((ordersData || []).map((o: any) => o.user_id).filter(Boolean))];
+    const riderIds = [...new Set((ordersData || []).map((o: any) => o.rider_id).filter(Boolean))];
+    const allProfileIds = [...new Set([...userIds, ...riderIds])];
+
+    let profilesMap: Record<string, any> = {};
+    if (allProfileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, phone, address')
+        .in('id', allProfileIds);
+      
+      profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
     }
     
     // Map to UI Order type
     setOrders((ordersData || []).map((order: any) => {
       const items = Array.isArray(order.items) ? order.items : [];
+      const customer = profilesMap[order.user_id];
+      const rider = profilesMap[order.rider_id];
+      
       return {
         id: order.id,
         order_number: order.order_number,
@@ -95,8 +115,8 @@ const Orders = () => {
         shippingAddress: order.shipping_address?.address || order.delivery_address || '',
         delivery_address: order.delivery_address,
         delivery_phone: order.delivery_phone,
-        rider: order.rider,
-        customer: order.customer,
+        rider: rider,
+        customer: customer,
         rawOrder: order,
       };
     }));

@@ -146,14 +146,25 @@ class DeliveryService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    // Get order details
+    // Get order details (without FK join - no FK exists)
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('*, profiles!orders_user_id_fkey(email)')
+      .select('*')
       .eq('id', orderId)
       .single();
 
     if (orderError || !order) throw new Error('Order not found');
+
+    // Get customer email separately
+    let customerEmail = '';
+    if (order.user_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', order.user_id)
+        .single();
+      customerEmail = profile?.email || '';
+    }
 
     // Reserve stock for the order items
     const itemsData = order.items;
@@ -181,11 +192,9 @@ class DeliveryService {
 
     // Notify customer
     if (order.user_id) {
-      const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
-      const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
       await comprehensiveNotificationService.notifyOrderStatusChange(
         order.user_id,
-        profileEmail || '',
+        customerEmail,
         order.order_number,
         COD_ORDER_STATUSES.PENDING_PHARMACY_CONFIRMATION,
         COD_ORDER_STATUSES.PREPARING_ORDER
@@ -199,11 +208,23 @@ class DeliveryService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    // Get order details (without FK join)
     const { data: order } = await supabase
       .from('orders')
-      .select('*, profiles!orders_user_id_fkey(email)')
+      .select('*')
       .eq('id', orderId)
       .single();
+
+    // Get customer email separately
+    let customerEmail = '';
+    if (order?.user_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', order.user_id)
+        .single();
+      customerEmail = profile?.email || '';
+    }
 
     const { error } = await supabase
       .from('orders')
@@ -224,11 +245,9 @@ class DeliveryService {
     });
 
     if (order?.user_id) {
-      const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
-      const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
       await comprehensiveNotificationService.notifyOrderStatusChange(
         order.user_id,
-        profileEmail || '',
+        customerEmail,
         order.order_number,
         order.status,
         COD_ORDER_STATUSES.CANCELLED
@@ -369,12 +388,12 @@ class DeliveryService {
   // ==========================================
 
   async getRiderAssignments(riderId: string): Promise<DeliveryAssignment[]> {
-    const { data, error } = await supabase
+    // Fetch assignments with orders (orders table join works fine)
+    const { data: assignments, error } = await supabase
       .from('delivery_assignments')
       .select(`
         *,
-        order:orders(id, order_number, total_amount, items, status, delivery_address, delivery_phone),
-        pharmacy:profiles!delivery_assignments_pharmacy_id_fkey(id, pharmacy_name, address, phone)
+        order:orders(id, order_number, total_amount, items, status, delivery_address, delivery_phone)
       `)
       .eq('rider_id', riderId)
       .in('status', ['assigned', 'accepted', 'picked_up'])
@@ -385,7 +404,29 @@ class DeliveryService {
       throw error;
     }
 
-    return (data || []) as DeliveryAssignment[];
+    if (!assignments || assignments.length === 0) return [];
+
+    // Fetch pharmacy profiles separately
+    const pharmacyIds = [...new Set(assignments.map((a: any) => a.pharmacy_id).filter(Boolean))];
+    let pharmaciesMap: Record<string, any> = {};
+    
+    if (pharmacyIds.length > 0) {
+      const { data: pharmacies } = await supabase
+        .from('profiles')
+        .select('id, pharmacy_name, address, phone')
+        .in('id', pharmacyIds);
+      
+      pharmaciesMap = (pharmacies || []).reduce((acc: Record<string, any>, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+    }
+
+    // Attach pharmacy data
+    return assignments.map((a: any) => ({
+      ...a,
+      pharmacy: pharmaciesMap[a.pharmacy_id] || null,
+    })) as DeliveryAssignment[];
   }
 
   async acceptDeliveryAssignment(assignmentId: string): Promise<void> {
@@ -506,19 +547,24 @@ class DeliveryService {
       notes: `Delivered and cash collected: TZS ${cashAmount}`,
     });
 
-    // Get order details for notification
+    // Get order details for notification (without FK join)
     const { data: order } = await supabase
       .from('orders')
-      .select('*, profiles!orders_user_id_fkey(email)')
+      .select('*')
       .eq('id', assignment.order_id)
       .single();
 
     if (order?.user_id) {
-      const profileData = order.profiles as { email?: string } | { email?: string }[] | null;
-      const profileEmail = Array.isArray(profileData) ? profileData[0]?.email : profileData?.email;
+      // Get customer email separately
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', order.user_id)
+        .single();
+      
       await comprehensiveNotificationService.notifyOrderStatusChange(
         order.user_id,
-        profileEmail || '',
+        profile?.email || '',
         order.order_number,
         COD_ORDER_STATUSES.OUT_FOR_DELIVERY,
         COD_ORDER_STATUSES.DELIVERED_AND_PAID
@@ -672,13 +718,10 @@ class DeliveryService {
   // ==========================================
 
   async getPharmacyCODOrders(pharmacyId: string): Promise<any[]> {
-    const { data, error } = await supabase
+    // Fetch orders without FK joins (no foreign keys exist on orders table)
+    const { data: ordersData, error } = await supabase
       .from('orders')
-      .select(`
-        *,
-        customer:profiles!orders_user_id_fkey(id, name, phone, address),
-        rider:profiles!orders_rider_id_fkey(id, name, phone)
-      `)
+      .select('*')
       .eq('pharmacy_id', pharmacyId)
       .eq('payment_method', 'cod')
       .in('status', [
@@ -695,7 +738,32 @@ class DeliveryService {
       throw error;
     }
 
-    return data || [];
+    if (!ordersData || ordersData.length === 0) return [];
+
+    // Fetch related profiles for customer and rider data
+    const userIds = [...new Set(ordersData.map((o: any) => o.user_id).filter(Boolean))];
+    const riderIds = [...new Set(ordersData.map((o: any) => o.rider_id).filter(Boolean))];
+    const allProfileIds = [...new Set([...userIds, ...riderIds])];
+
+    let profilesMap: Record<string, any> = {};
+    if (allProfileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, phone, address')
+        .in('id', allProfileIds);
+      
+      profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+    }
+
+    // Attach customer and rider data to orders
+    return ordersData.map((order: any) => ({
+      ...order,
+      customer: profilesMap[order.user_id] || null,
+      rider: profilesMap[order.rider_id] || null,
+    }));
   }
 
   // ==========================================

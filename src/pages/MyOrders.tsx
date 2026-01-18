@@ -63,22 +63,39 @@ const MyOrders = () => {
     setIsLoading(true);
     
     try {
+      // Fetch orders without FK joins (no foreign keys exist on orders table)
       const { data, error } = await supabase
         .from('orders')
-        .select(`
-          *,
-          pharmacy:profiles!orders_profile_id_fkey(id, pharmacy_name, address, phone),
-          rider:profiles!orders_rider_id_fkey(id, name, phone)
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .neq('status', 'cart')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Fetch related profiles for pharmacy and rider data
+      const pharmacyIds = [...new Set((data || []).map((o: any) => o.pharmacy_id).filter(Boolean))];
+      const riderIds = [...new Set((data || []).map((o: any) => o.rider_id).filter(Boolean))];
+      const allProfileIds = [...new Set([...pharmacyIds, ...riderIds])];
+
+      let profilesMap: Record<string, any> = {};
+      if (allProfileIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, phone, address, pharmacy_name')
+          .in('id', allProfileIds);
+        
+        profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
+          acc[p.id] = p;
+          return acc;
+        }, {});
+      }
       
       const ordersWithParsedItems = (data || []).map(order => ({
         ...order,
-        items: Array.isArray(order.items) ? order.items : JSON.parse(String(order.items) || '[]')
+        items: Array.isArray(order.items) ? order.items : JSON.parse(String(order.items) || '[]'),
+        pharmacy: profilesMap[order.pharmacy_id] || null,
+        rider: profilesMap[order.rider_id] || null,
       }));
       
       setOrders(ordersWithParsedItems);
