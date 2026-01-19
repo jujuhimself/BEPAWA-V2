@@ -249,6 +249,11 @@ export const useCreateCODOrder = () => {
       delivery_phone: string;
       delivery_notes?: string;
       pharmacy_id: string;
+      delivery_fee?: number;
+      delivery_coordinates?: {
+        latitude: number;
+        longitude: number;
+      };
     }) => deliveryService.createCODOrder(orderData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });

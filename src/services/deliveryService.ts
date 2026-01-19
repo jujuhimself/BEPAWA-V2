@@ -65,6 +65,11 @@ class DeliveryService {
     delivery_phone: string;
     delivery_notes?: string;
     pharmacy_id: string;
+    delivery_fee?: number;
+    delivery_coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
   }): Promise<any> {
     const orderNumber = this.generateOrderNumber();
     
@@ -84,6 +89,7 @@ class DeliveryService {
         delivery_address: orderData.delivery_address,
         delivery_phone: orderData.delivery_phone,
         delivery_notes: orderData.delivery_notes,
+        delivery_fee: orderData.delivery_fee || 0,
       })
       .select()
       .single();

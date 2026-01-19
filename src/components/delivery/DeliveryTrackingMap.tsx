@@ -2,15 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, RefreshCw, AlertCircle, Locate } from 'lucide-react';
+import { MapPin, Navigation, RefreshCw, AlertCircle, Locate, Phone, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DeliveryTrackingMapProps {
   orderId: string;
-  riderId: string;
+  riderId?: string;
   deliveryAddress?: string;
   pickupAddress?: string;
   showRiderControls?: boolean;
+  deliveryCoordinates?: { latitude: number; longitude: number };
+  pickupCoordinates?: { latitude: number; longitude: number };
+  customerName?: string;
+  customerPhone?: string;
 }
 
 interface RiderLocation {
@@ -24,11 +28,17 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
   riderId,
   deliveryAddress,
   pickupAddress,
-  showRiderControls = false
+  showRiderControls = false,
+  deliveryCoordinates,
+  pickupCoordinates,
+  customerName,
+  customerPhone
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
   const riderMarker = useRef<any>(null);
+  const deliveryMarker = useRef<any>(null);
+  const pickupMarker = useRef<any>(null);
   const [riderLocation, setRiderLocation] = useState<RiderLocation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,19 +46,14 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
   const watchId = useRef<number | null>(null);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
-  // Fetch Mapbox token from Supabase secrets
+  // Fetch Mapbox token
   useEffect(() => {
-    const fetchMapboxToken = async () => {
-      // The token should be stored in Supabase Edge Function secrets
-      // For now, we'll use a fallback UI if token is not available
-      const token = import.meta.env.VITE_MAPBOX_TOKEN || null;
-      setMapboxToken(token);
-      if (!token) {
-        setError('Map configuration pending. Contact support if this persists.');
-        setIsLoading(false);
-      }
-    };
-    fetchMapboxToken();
+    const token = import.meta.env.VITE_MAPBOX_TOKEN || null;
+    setMapboxToken(token);
+    if (!token) {
+      setError('Map configuration pending. Contact support if this persists.');
+      setIsLoading(false);
+    }
   }, []);
 
   // Initialize map when token is available
@@ -62,8 +67,14 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
         
         mapboxgl.accessToken = mapboxToken;
         
-        // Default to Dodoma, Tanzania
-        const defaultCenter: [number, number] = [35.7516, -6.1630];
+        // Default to Dodoma, Tanzania or use provided coordinates
+        let defaultCenter: [number, number] = [35.7516, -6.1630];
+        
+        if (deliveryCoordinates) {
+          defaultCenter = [deliveryCoordinates.longitude, deliveryCoordinates.latitude];
+        } else if (pickupCoordinates) {
+          defaultCenter = [pickupCoordinates.longitude, pickupCoordinates.latitude];
+        }
         
         map.current = new mapboxgl.Map({
           container: mapContainer.current!,
@@ -85,17 +96,47 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
           .setLngLat(defaultCenter)
           .addTo(map.current);
 
-        // Add delivery destination marker if address exists
-        if (deliveryAddress) {
+        // Add pickup marker (pharmacy)
+        if (pickupCoordinates) {
+          const pickupEl = document.createElement('div');
+          pickupEl.innerHTML = '🏥';
+          pickupEl.style.fontSize = '32px';
+          
+          pickupMarker.current = new mapboxgl.Marker({ element: pickupEl })
+            .setLngLat([pickupCoordinates.longitude, pickupCoordinates.latitude])
+            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Pharmacy</strong><br/>${pickupAddress || 'Pickup location'}`))
+            .addTo(map.current);
+        }
+
+        // Add delivery destination marker
+        if (deliveryCoordinates) {
           const destEl = document.createElement('div');
-          destEl.className = 'dest-marker';
           destEl.innerHTML = '📍';
           destEl.style.fontSize = '32px';
           
-          // In production, geocode the address
+          deliveryMarker.current = new mapboxgl.Marker({ element: destEl })
+            .setLngLat([deliveryCoordinates.longitude, deliveryCoordinates.latitude])
+            .setPopup(new mapboxgl.Popup().setHTML(`<strong>${customerName || 'Customer'}</strong><br/>${deliveryAddress || 'Delivery location'}`))
+            .addTo(map.current);
+        } else if (deliveryAddress) {
+          // Fallback: place marker at offset if no coordinates
+          const destEl = document.createElement('div');
+          destEl.innerHTML = '📍';
+          destEl.style.fontSize = '32px';
+          
           new mapboxgl.Marker({ element: destEl })
             .setLngLat([defaultCenter[0] + 0.01, defaultCenter[1] + 0.01])
+            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Delivery</strong><br/>${deliveryAddress}`))
             .addTo(map.current);
+        }
+
+        // Fit bounds if we have both pickup and delivery
+        if (pickupCoordinates && deliveryCoordinates) {
+          const bounds = new mapboxgl.LngLatBounds()
+            .extend([pickupCoordinates.longitude, pickupCoordinates.latitude])
+            .extend([deliveryCoordinates.longitude, deliveryCoordinates.latitude]);
+          
+          map.current.fitBounds(bounds, { padding: 60 });
         }
 
         setIsLoading(false);
@@ -113,7 +154,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
         map.current.remove();
       }
     };
-  }, [mapboxToken, deliveryAddress]);
+  }, [mapboxToken, deliveryAddress, deliveryCoordinates, pickupAddress, pickupCoordinates, customerName]);
 
   // Subscribe to rider location updates
   useEffect(() => {
@@ -246,6 +287,16 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                       Delivery Location
                     </p>
                     <p className="text-sm text-muted-foreground">{deliveryAddress}</p>
+                    {customerName && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <User className="h-3 w-3" /> {customerName}
+                        {customerPhone && (
+                          <a href={`tel:${customerPhone}`} className="ml-2 text-primary flex items-center gap-1">
+                            <Phone className="h-3 w-3" /> {customerPhone}
+                          </a>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <Button 
                     size="sm" 
