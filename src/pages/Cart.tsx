@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, ShoppingCart, Minus, Plus, Trash2, Truck, MapPin, Phone } from "lucide-react";
+import { CreditCard, ShoppingCart, Minus, Plus, Trash2, Truck, MapPin, Phone, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { orderService } from '@/services/orderService';
 import { inventoryService } from '@/services/inventoryService';
 import { useCreateCODOrder } from '@/hooks/useDelivery';
+import LocationPicker, { LocationData } from '@/components/delivery/LocationPicker';
+import { 
+  calculateDeliveryFee, 
+  calculateDistance, 
+  getDeliveryFeeBreakdown,
+  MAX_DELIVERY_DISTANCE_KM,
+  formatTZS,
+  DELIVERY_PRICE_TIERS
+} from '@/utils/deliveryPricing';
+import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CartItem {
   id: string;
@@ -24,6 +40,12 @@ interface CartItem {
   category: string;
   pharmacy_id?: string;
 }
+
+// Default pharmacy location (Dodoma, Tanzania)
+const DEFAULT_PHARMACY_LOCATION = {
+  latitude: -6.1630,
+  longitude: 35.7516
+};
 
 const Cart = () => {
   const { user } = useAuth();
@@ -38,9 +60,11 @@ const Cart = () => {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cod'>('card');
   
   // COD delivery details
-  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState<LocationData | null>(null);
   const [deliveryPhone, setDeliveryPhone] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [pharmacyLocation, setPharmacyLocation] = useState(DEFAULT_PHARMACY_LOCATION);
+  const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   
   const createCODOrder = useCreateCODOrder();
 
@@ -145,16 +169,16 @@ const Cart = () => {
   };
 
   const getDeliveryFee = () => {
-    // Standard delivery fee for COD
-    return 2500;
+    // Calculate based on distance
+    return calculateDeliveryFee(deliveryDistance);
   };
 
   const handleCODCheckout = async () => {
     if (!user) return;
-    if (!deliveryAddress || !deliveryPhone) {
+    if (!deliveryLocation || !deliveryPhone) {
       toast({ 
         title: 'Missing Information', 
-        description: 'Please provide delivery address and phone number', 
+        description: 'Please select a delivery location and provide phone number', 
         variant: 'destructive' 
       });
       return;
@@ -193,10 +217,15 @@ const Cart = () => {
       user_id: user.id,
       items: cartItems,
       total_amount: getTotalPrice() + getDeliveryFee(),
-      delivery_address: deliveryAddress,
+      delivery_address: deliveryLocation.address,
       delivery_phone: deliveryPhone,
       delivery_notes: deliveryNotes,
-      pharmacy_id: pharmacyId
+      pharmacy_id: pharmacyId,
+      delivery_fee: getDeliveryFee(),
+      delivery_coordinates: {
+        latitude: deliveryLocation.latitude,
+        longitude: deliveryLocation.longitude
+      }
     }, {
       onSuccess: async () => {
         await clearCart();
@@ -462,18 +491,69 @@ const Cart = () => {
                       
                       <div className="space-y-3">
                         <div>
-                          <Label htmlFor="delivery-address" className="flex items-center gap-1">
+                          <Label className="flex items-center gap-1 mb-2">
                             <MapPin className="h-4 w-4" />
-                            Delivery Address
+                            Delivery Location
                           </Label>
-                          <Textarea
-                            id="delivery-address"
-                            placeholder="Enter your full delivery address..."
-                            value={deliveryAddress}
-                            onChange={(e) => setDeliveryAddress(e.target.value)}
-                            className="mt-1"
-                            required
+                          <LocationPicker
+                            onLocationSelect={(location) => {
+                              setDeliveryLocation(location);
+                              // Calculate distance from pharmacy
+                              const distance = calculateDistance(
+                                pharmacyLocation.latitude,
+                                pharmacyLocation.longitude,
+                                location.latitude,
+                                location.longitude
+                              );
+                              setDeliveryDistance(distance);
+                            }}
+                            pharmacyLocation={pharmacyLocation}
+                            placeholder="Search for your delivery location..."
                           />
+                          
+                          {/* Distance and Fee Display */}
+                          {deliveryLocation && (
+                            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary">
+                                    {deliveryDistance.toFixed(1)} km
+                                  </Badge>
+                                  <span className="text-sm text-muted-foreground">from pharmacy</span>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-primary">
+                                    {formatTZS(getDeliveryFee())}
+                                  </p>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <Info className="h-3 w-3" />
+                                          Delivery fee
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p className="font-medium mb-1">Delivery Pricing</p>
+                                        <ul className="text-xs space-y-0.5">
+                                          {DELIVERY_PRICE_TIERS.map((tier, i) => (
+                                            <li key={i}>
+                                              {tier.minKm}-{tier.maxKm} km: {formatTZS(tier.price)}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                              </div>
+                              {deliveryDistance > MAX_DELIVERY_DISTANCE_KM && (
+                                <p className="text-xs text-amber-600 mt-2">
+                                  ⚠️ This location is beyond our standard delivery range ({MAX_DELIVERY_DISTANCE_KM} km)
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                         
                         <div>
@@ -509,7 +589,7 @@ const Cart = () => {
                       <Button
                         className="w-full flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-lg py-3"
                         onClick={handleCODCheckout}
-                        disabled={createCODOrder.isPending || !deliveryAddress || !deliveryPhone}
+                        disabled={createCODOrder.isPending || !deliveryLocation || !deliveryPhone}
                       >
                         <Truck className="h-5 w-5" />
                         {createCODOrder.isPending ? "Placing Order..." : "Place COD Order"}
