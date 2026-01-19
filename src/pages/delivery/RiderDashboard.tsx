@@ -42,12 +42,22 @@ const RiderDashboard: React.FC = () => {
 
   const [cashDialogOpen, setCashDialogOpen] = useState(false);
   const [failDialogOpen, setFailDialogOpen] = useState(false);
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [mapAddress, setMapAddress] = useState<string>('');
+  const [mapType, setMapType] = useState<'pickup' | 'delivery'>('pickup');
   const [cashAmount, setCashAmount] = useState('');
   const [failReason, setFailReason] = useState('');
   const [isTracking, setIsTracking] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const watchIdRef = React.useRef<number | null>(null);
+
+  const openMapDialog = (assignment: any, type: 'pickup' | 'delivery') => {
+    setSelectedAssignment(assignment);
+    setMapAddress(type === 'pickup' ? assignment.pickup_address : assignment.delivery_address);
+    setMapType(type);
+    setMapDialogOpen(true);
+  };
 
   // Auto-start location tracking when rider picks up an order
   useEffect(() => {
@@ -348,7 +358,7 @@ const RiderDashboard: React.FC = () => {
                       </Button>
                       <Button 
                         variant="outline"
-                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(assignment.pickup_address)}`, '_blank')}
+                        onClick={() => openMapDialog(assignment, 'pickup')}
                       >
                         <Navigation className="h-4 w-4" />
                       </Button>
@@ -374,7 +384,7 @@ const RiderDashboard: React.FC = () => {
                       </Button>
                       <Button 
                         variant="outline"
-                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(assignment.delivery_address)}`, '_blank')}
+                        onClick={() => openMapDialog(assignment, 'delivery')}
                       >
                         <Navigation className="h-4 w-4" />
                       </Button>
@@ -460,6 +470,33 @@ const RiderDashboard: React.FC = () => {
               Report Failure
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Map Dialog */}
+      <Dialog open={mapDialogOpen} onOpenChange={setMapDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              {mapType === 'pickup' ? 'Pickup Location' : 'Delivery Location'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="h-[400px]">
+            {selectedAssignment && (
+              <DeliveryTrackingMap 
+                orderId={selectedAssignment.order_id}
+                riderId={user?.id || ''}
+                deliveryAddress={mapType === 'delivery' ? mapAddress : undefined}
+                pickupAddress={mapType === 'pickup' ? mapAddress : undefined}
+                showRiderControls={true}
+              />
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 inline mr-1" />
+            {mapAddress}
+          </p>
         </DialogContent>
       </Dialog>
     </div>
