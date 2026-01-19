@@ -19,6 +19,7 @@ import {
   X,
   Check
 } from 'lucide-react';
+import DeliveryTrackingMap from '@/components/delivery/DeliveryTrackingMap';
 import { useToast } from '@/hooks/use-toast';
 import { 
   useAcceptOrder, 
@@ -57,6 +58,7 @@ const CODOrderManager: React.FC<CODOrderManagerProps> = ({ order, onStatusUpdate
   const [open, setOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [riderDialogOpen, setRiderDialogOpen] = useState(false);
+  const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [selectedRider, setSelectedRider] = useState('');
 
@@ -423,7 +425,7 @@ const CODOrderManager: React.FC<CODOrderManagerProps> = ({ order, onStatusUpdate
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address || '')}`, '_blank')}
+                        onClick={() => setMapDialogOpen(true)}
                       >
                         <MapPin className="h-4 w-4 mr-1" />
                         View on Map
@@ -503,6 +505,26 @@ const CODOrderManager: React.FC<CODOrderManagerProps> = ({ order, onStatusUpdate
               Assign Rider
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Map Dialog */}
+      <Dialog open={mapDialogOpen} onOpenChange={setMapDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Delivery Location</DialogTitle>
+          </DialogHeader>
+          <div className="h-[400px]">
+            <DeliveryTrackingMap 
+              orderId={order.id}
+              riderId={order.rider?.id || ''}
+              deliveryAddress={order.delivery_address}
+            />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 inline mr-1" />
+            {order.delivery_address}
+          </p>
         </DialogContent>
       </Dialog>
     </>
