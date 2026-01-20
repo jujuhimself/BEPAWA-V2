@@ -1,44 +1,54 @@
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, Loader2, AlertTriangle, Store } from "lucide-react";
+import { 
+  Store, 
+  Package, 
+  ShoppingCart, 
+  Clock, 
+  TrendingUp, 
+  BarChart3, 
+  Scan, 
+  Building2, 
+  BoxesIcon,
+  FileText,
+  CreditCard,
+  Truck,
+  Plus
+} from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
+import { Badge } from "@/components/ui/badge";
 
-import { BreadcrumbNavigation } from "@/components/BreadcrumbNavigation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import QuickReorder from "@/components/QuickReorder";
 import BarcodeScanner from '@/components/BarcodeScanner';
 import BusinessTools from '@/components/BusinessTools';
 import { InvoiceGenerator } from "@/components/invoice/InvoiceGenerator";
-
-import { SubscriptionStatusCard } from "@/components/subscription/SubscriptionStatusCard";
-import PharmacyStatsCards from "@/components/pharmacy/PharmacyStatsCards";
-import PharmacyQuickActions from "@/components/pharmacy/PharmacyQuickActions";
-import PharmacyAdditionalServices from "@/components/pharmacy/PharmacyAdditionalServices";
-import PharmacyRecentOrders from "@/components/pharmacy/PharmacyRecentOrders";
 import PharmacyCODOrders from "@/components/pharmacy/PharmacyCODOrders";
 
+import {
+  DashboardLayout,
+  StatsCard,
+  QuickActionCard,
+  DashboardSection,
+  ActivityCard,
+  EmptyStateCard,
+} from "@/components/dashboard";
+
 import { useAuth } from "@/contexts/AuthContext";
-import { useSubscription } from "@/hooks/use-subscription";
 import { useNotificationSubscription } from "@/hooks/useNotifications";
 import { notificationService } from "@/services/notificationService";
-
-import { SUBSCRIPTION_PLANS } from "@/types/subscription";
 import { supabase } from "@/integrations/supabase/client";
 import { logError } from "@/utils/logger";
 
 export default function PharmacyDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { currentPlan, getMaxStaffAccounts, getMaxBranches } = useSubscription();
-  const maxStaffAccounts = getMaxStaffAccounts();
-  const maxBranches = getMaxBranches();
 
-  // Ensure real-time notifications are enabled for pharmacy users
   useNotificationSubscription();
   
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -46,7 +56,6 @@ export default function PharmacyDashboard() {
     queryFn: async () => {
       if (!user) throw new Error("User not authenticated.");
 
-      // Fetch orders for current pharmacy
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
@@ -59,13 +68,13 @@ export default function PharmacyDashboard() {
         throw ordersError;
       }
 
-      // For cart, still use localStorage
       const cart = JSON.parse(localStorage.getItem(`bepawa_cart_${user.id}`) || '[]');
 
       const stats = {
         totalOrders: orders?.length || 0,
         pendingOrders: (orders || []).filter((o: any) => o.status === 'pending').length,
-        cartItems: cart.length
+        cartItems: cart.length,
+        deliveredOrders: (orders || []).filter((o: any) => o.status === 'delivered').length,
       };
       
       const recentOrders = (orders || []).slice(0, 5);
@@ -77,29 +86,15 @@ export default function PharmacyDashboard() {
 
   useEffect(() => {
     if (data && user?.pharmacyName) {
-      const sendWelcomeNotification = async () => {
-        try {
-          await notificationService.createNotification({
-            user_id: user.id,
-            title: 'Welcome Back!',
-            message: `Welcome back, ${user.pharmacyName}! Your dashboard has been updated with the latest information.`,
-            type: 'info',
-            metadata: {
-              priority: 'low',
-              category: 'system'
-            }
-          });
-        } catch (error) {
-          console.error('Failed to send welcome notification:', error);
-        }
-      };
-      
-      sendWelcomeNotification();
+      notificationService.createNotification({
+        user_id: user.id,
+        title: 'Welcome Back!',
+        message: `Welcome back, ${user.pharmacyName}!`,
+        type: 'info',
+        metadata: { priority: 'low', category: 'system' }
+      }).catch(console.error);
     }
-  }, [data, user?.pharmacyName]);
-
-  const stats = data?.stats || { totalOrders: 0, pendingOrders: 0, cartItems: 0 };
-  const recentOrders = data?.recentOrders || [];
+  }, [data, user?.pharmacyName, user?.id]);
 
   useEffect(() => {
     if (!user || user.role !== 'retail') {
@@ -107,151 +102,208 @@ export default function PharmacyDashboard() {
     }
   }, [user, navigate]);
 
-  if (!user || user.role !== 'retail') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-      </div>
-    );
-  }
+  if (!user || user.role !== 'retail') return null;
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-96">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-lg">Loading your dashboard...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const stats = data?.stats || { totalOrders: 0, pendingOrders: 0, cartItems: 0, deliveredOrders: 0 };
+  const recentOrders = data?.recentOrders || [];
 
-  if (isError) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col items-center justify-center min-h-96">
-            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-            <div className="text-destructive text-lg mb-4">Error loading dashboard: {(error as Error)?.message || "An unknown error occurred."}</div>
-            <Button onClick={() => refetch()}>
-              Retry
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const getStatusVariant = (status: string): "success" | "warning" | "danger" | "info" | "default" => {
+    switch (status) {
+      case 'delivered': return 'success';
+      case 'pending': return 'warning';
+      case 'cancelled': return 'danger';
+      default: return 'info';
+    }
+  };
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <BreadcrumbNavigation />
-          
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h1 className="text-4xl font-bold text-foreground mb-2">
-                  Welcome back, {user?.pharmacyName}
-                </h1>
-                <p className="text-muted-foreground text-lg">Manage your orders and browse our medical product catalog</p>
-              </div>
-            </div>
-          </div>
-
-
-          {/* Quick Access Cards for Forecasting and Barcode Scanner */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <Link to="/pharmacy/forecast">
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-700">
-                    <span role="img" aria-label="Forecast">📈</span> Inventory Forecasting
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Predict demand, plan stock, and optimize reordering for your pharmacy.</p>
-                </CardContent>
-              </Card>
-            </Link>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow border-green-200">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-green-700">
-                      <span role="img" aria-label="Barcode">🔍</span> Barcode Scanner
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600">Scan product barcodes to quickly find and manage inventory items.</p>
-                  </CardContent>
-                </Card>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl w-full">
-                <BarcodeScanner />
-              </DialogContent>
-            </Dialog>
-            <Link to="/retail/branches">
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow border-purple-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-700">
-                    <span role="img" aria-label="Branches">🏢</span> Branch Management
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Manage your branches, add new locations, and assign staff.</p>
-                </CardContent>
-              </Card>
-            </Link>
-            <Link to="/retail/branch-inventory">
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow border-orange-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-orange-700">
-                    <span role="img" aria-label="Inventory">📦</span> Branch Inventory
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Manage inventory for your selected branch.</p>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-
-          <PharmacyStatsCards stats={stats} />
-          <QuickReorder />
-
-          {/* Analytics Dashboard */}
-          <div className="mb-8">
-            <Card className="shadow-lg border-0">
-              <CardHeader>
-                <CardTitle className="text-2xl">Business Analytics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AnalyticsDashboard />
-              </CardContent>
-            </Card>
-          </div>
-
-          <PharmacyQuickActions cartItems={stats.cartItems} />
-          
-          {/* COD Orders Section */}
-          <div className="mb-8">
-            <PharmacyCODOrders />
-          </div>
-          
-          <PharmacyAdditionalServices />
-          <PharmacyRecentOrders recentOrders={recentOrders} />
-          
-          {/* Invoice Generator */}
-          <div className="mb-8">
-            <InvoiceGenerator />
-          </div>
-          
-          <BusinessTools />
+      <DashboardLayout
+        title={`Welcome back, ${user?.pharmacyName || 'Pharmacy'}`}
+        subtitle="Manage your orders, inventory, and grow your business"
+        icon={<Store className="h-6 w-6" />}
+        badge="Pharmacy"
+        isLoading={isLoading}
+        isError={isError}
+        error={error as Error}
+        onRetry={refetch}
+        actions={
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Scan className="h-4 w-4" />
+                Scan Barcode
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <BarcodeScanner />
+            </DialogContent>
+          </Dialog>
+        }
+      >
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total Orders"
+            value={stats.totalOrders}
+            subtitle="All time"
+            icon={<Package className="h-5 w-5" />}
+            variant="primary"
+          />
+          <StatsCard
+            title="Pending Orders"
+            value={stats.pendingOrders}
+            subtitle="Awaiting action"
+            icon={<Clock className="h-5 w-5" />}
+            variant="warning"
+          />
+          <StatsCard
+            title="Delivered"
+            value={stats.deliveredOrders}
+            subtitle="Completed orders"
+            icon={<Truck className="h-5 w-5" />}
+            variant="success"
+          />
+          <StatsCard
+            title="Cart Items"
+            value={stats.cartItems}
+            subtitle="Items to order"
+            icon={<ShoppingCart className="h-5 w-5" />}
+            variant="info"
+          />
         </div>
-      </div>
+
+        {/* Quick Actions */}
+        <DashboardSection
+          title="Quick Actions"
+          description="Frequently used features"
+          icon={<TrendingUp className="h-4 w-4" />}
+        >
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <QuickActionCard
+              title="Inventory Forecast"
+              description="Predict demand & optimize stock"
+              icon={<BarChart3 className="h-5 w-5" />}
+              href="/pharmacy/forecast"
+              variant="primary"
+            />
+            <QuickActionCard
+              title="Branch Management"
+              description="Manage locations & staff"
+              icon={<Building2 className="h-5 w-5" />}
+              href="/retail/branches"
+              variant="info"
+            />
+            <QuickActionCard
+              title="Branch Inventory"
+              description="Track stock by branch"
+              icon={<BoxesIcon className="h-5 w-5" />}
+              href="/retail/branch-inventory"
+              variant="warning"
+            />
+            <QuickActionCard
+              title="View Cart"
+              description={`${stats.cartItems} items in cart`}
+              icon={<ShoppingCart className="h-5 w-5" />}
+              href="/cart"
+              variant="success"
+            />
+          </div>
+        </DashboardSection>
+
+        {/* Additional Quick Links */}
+        <div className="grid sm:grid-cols-3 gap-4">
+          <QuickActionCard
+            title="Order History"
+            description="View all past orders"
+            icon={<Clock className="h-5 w-5" />}
+            href="/orders"
+          />
+          <QuickActionCard
+            title="Credit Management"
+            description="Manage credit & payments"
+            icon={<CreditCard className="h-5 w-5" />}
+            href="/credit-management"
+          />
+          <QuickActionCard
+            title="Prescriptions"
+            description="Manage prescriptions"
+            icon={<FileText className="h-5 w-5" />}
+            href="/prescription-management"
+          />
+        </div>
+
+        {/* Quick Reorder Section */}
+        <QuickReorder />
+
+        {/* COD Orders */}
+        <DashboardSection
+          title="COD Orders"
+          description="Cash on delivery orders requiring action"
+          icon={<Truck className="h-4 w-4" />}
+          action={{ label: "View All Orders", href: "/orders" }}
+        >
+          <PharmacyCODOrders />
+        </DashboardSection>
+
+        {/* Recent Orders */}
+        <DashboardSection
+          title="Recent Orders"
+          description="Your latest incoming orders"
+          icon={<Package className="h-4 w-4" />}
+          action={{ label: "View All", href: "/orders" }}
+        >
+          {recentOrders.length === 0 ? (
+            <EmptyStateCard
+              icon={<Package className="h-6 w-6" />}
+              title="No orders yet"
+              description="When customers place orders, they'll appear here"
+              action={{ label: "Browse Products", href: "/products" }}
+            />
+          ) : (
+            <div className="space-y-3">
+              {recentOrders.map((order: any) => (
+                <ActivityCard
+                  key={order.id}
+                  title={`Order #${order.order_number || order.id.slice(0, 8)}`}
+                  subtitle={`TZS ${order.total_amount?.toLocaleString() || 0}`}
+                  timestamp={new Date(order.created_at).toLocaleDateString()}
+                  status={{
+                    label: order.status?.replace(/-/g, ' ').toUpperCase() || 'PENDING',
+                    variant: getStatusVariant(order.status),
+                  }}
+                  icon={<Package className="h-5 w-5" />}
+                />
+              ))}
+            </div>
+          )}
+        </DashboardSection>
+
+        {/* Analytics Section */}
+        <DashboardSection
+          title="Business Analytics"
+          description="Track your pharmacy performance"
+          icon={<BarChart3 className="h-4 w-4" />}
+        >
+          <Card className="border-border bg-card">
+            <CardContent className="pt-6">
+              <AnalyticsDashboard />
+            </CardContent>
+          </Card>
+        </DashboardSection>
+
+        {/* Invoice Generator */}
+        <DashboardSection
+          title="Invoice Generator"
+          description="Create and manage invoices"
+          icon={<FileText className="h-4 w-4" />}
+        >
+          <InvoiceGenerator />
+        </DashboardSection>
+
+        {/* Business Tools */}
+        <BusinessTools />
+      </DashboardLayout>
     </ErrorBoundary>
   );
 }
