@@ -1,24 +1,41 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Package, DollarSign, Users, TrendingUp, FileText, BarChart3, Calendar, FileSearch, Clock } from "lucide-react";
+import { 
+  Package, 
+  DollarSign, 
+  Users, 
+  TrendingUp, 
+  FileText, 
+  BarChart3, 
+  Building2,
+  BoxesIcon,
+  Scan,
+  AlertTriangle,
+  Clock
+} from "lucide-react";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+
+import {
+  DashboardLayout,
+  StatsCard,
+  QuickActionCard,
+  DashboardSection,
+  ActivityCard,
+  EmptyStateCard,
+} from "@/components/dashboard";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranch } from "@/contexts/BranchContext";
-import BackupScheduleManager from "@/components/BackupScheduleManager";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { useReportTemplates, useGenerateReport, useGeneratedReports } from "@/hooks/useReporting";
-import ReportModal from "@/components/ReportModal";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import InventoryForecasting from '@/components/inventory/InventoryForecasting';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import { InvoiceGenerator } from "@/components/invoice/InvoiceGenerator";
 
-// Add the missing Button import here
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SubscriptionStatusCard } from "@/components/subscription/SubscriptionStatusCard";
-
-// Define type for orders
 type WholesaleOrder = {
   id: string;
   order_number: string;
@@ -29,32 +46,21 @@ type WholesaleOrder = {
   pharmacy_name?: string;
 };
 
-// Type for retail profile
-type RetailerProfile = {
-  id: string;
-  name: string;
-  business_name: string;
-};
-
-// Analytics data types
 type AnalyticsData = {
   monthlyRevenue: any[];
-  topProducts: any[];
   orderTrends: any[];
-  retailerDistribution: any[];
 };
 
-// Import new components
-import WholesaleStatsCards from "@/components/wholesale/WholesaleStatsCards";
-import WholesaleQuickActions from "@/components/wholesale/WholesaleQuickActions";
-import WholesaleRecentOrders from "@/components/wholesale/WholesaleRecentOrders";
-import { InvoiceGenerator } from "@/components/invoice/InvoiceGenerator";
+const COLORS = ['hsl(var(--primary))', 'hsl(180, 70%, 45%)', 'hsl(25, 95%, 53%)', 'hsl(0, 70%, 50%)', 'hsl(270, 70%, 60%)'];
 
 const WholesaleDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { selectedBranch } = useBranch();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  
   const [orders, setOrders] = useState<WholesaleOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalOrders: 0,
@@ -63,172 +69,109 @@ const WholesaleDashboard = () => {
   });
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     monthlyRevenue: [],
-    topProducts: [],
-    orderTrends: [],
-    retailerDistribution: []
+    orderTrends: []
   });
 
-  // Automated Reporting
-  const { data: reportTemplates } = useReportTemplates();
-  const { mutate: generateReport, isPending } = useGenerateReport();
-  const { data: generatedReports, isLoading: loadingReports } = useGeneratedReports();
-  const [reportModalOpen, setReportModalOpen] = useState(false);
-  const { toast } = useToast();
-
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-
-  // Helper: load orders, stats, retailers
   useEffect(() => {
     if (!user || user.role !== 'wholesale') {
       navigate('/login');
       return;
     }
 
-    // Fetch orders from Supabase by wholesaler_id
     async function fetchWholesaleData() {
-      // 1. Orders
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .select('id, order_number, created_at, total_amount, status, pharmacy_id')
-        .eq('wholesaler_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      setIsLoading(true);
+      try {
+        // Fetch orders
+        const { data: orderData, error: orderError } = await supabase
+          .from('orders')
+          .select('id, order_number, created_at, total_amount, status, pharmacy_id')
+          .eq('wholesaler_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-      if (orderError) {
-        setOrders([]); // fallback
-        return;
-      }
+        if (orderError) throw orderError;
 
-      // Fetch pharmacy names for display (batch query)
-      const pharmacyIds = orderData?.map((o: any) => o.pharmacy_id).filter(Boolean);
-      let pharmacies: Record<string, string> = {};
-      if (pharmacyIds && pharmacyIds.length > 0) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, business_name, name')
-          .in('id', pharmacyIds);
+        // Fetch pharmacy names
+        const pharmacyIds = orderData?.map((o: any) => o.pharmacy_id).filter(Boolean);
+        let pharmacies: Record<string, string> = {};
+        
+        if (pharmacyIds && pharmacyIds.length > 0) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('id, business_name, name')
+            .in('id', pharmacyIds);
 
-        profileData?.forEach((profile: any) => {
-          pharmacies[profile.id] = profile.business_name || profile.name;
+          profileData?.forEach((profile: any) => {
+            pharmacies[profile.id] = profile.business_name || profile.name;
+          });
+        }
+
+        const enhancedOrders = (orderData || []).map((order: any) => ({
+          ...order,
+          pharmacy_name: pharmacies[order.pharmacy_id] || ""
+        }));
+
+        setOrders(enhancedOrders);
+
+        // Fetch all orders for stats
+        const { data: allOrders } = await supabase
+          .from('orders')
+          .select('id, total_amount, pharmacy_id, created_at')
+          .eq('wholesaler_id', user.id);
+
+        const totalRevenue = (allOrders || []).reduce((sum: number, ord: any) => sum + Number(ord.total_amount || 0), 0);
+        const totalOrders = (allOrders || []).length || 0;
+        const activeRetailers = new Set((allOrders || []).map((o: any) => o.pharmacy_id)).size;
+
+        // Count low stock items
+        const { data: productData } = await supabase
+          .from('products')
+          .select('id, stock, min_stock_level')
+          .eq('wholesaler_id', user.id);
+
+        const lowStockItems = productData?.filter((prod: any) => Number(prod.stock) <= Number(prod.min_stock_level || 10)).length || 0;
+
+        setStats({ totalRevenue, totalOrders, activeRetailers, lowStockItems });
+
+        // Generate analytics
+        const monthlyRevenue = generateMonthlyRevenueData(allOrders || []);
+        const orderTrends = generateOrderTrendsData(allOrders || []);
+        setAnalyticsData({ monthlyRevenue, orderTrends });
+
+      } catch (error) {
+        console.error('Error fetching wholesale data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data",
+          variant: "destructive"
         });
+      } finally {
+        setIsLoading(false);
       }
-
-      const enhancedOrders = (orderData || []).map((order: any) => ({
-        ...order,
-        pharmacy_name: pharmacies[order.pharmacy_id] || ""
-      }));
-
-      setOrders(enhancedOrders);
-
-      // 2. Stats - aggregate from all orders for this wholesaler
-      const { data: allOrders } = await supabase
-        .from('orders')
-        .select('id, total_amount, pharmacy_id')
-        .eq('wholesaler_id', user.id);
-
-      const totalRevenue = (allOrders || []).reduce((sum: number, ord: any) => sum + Number(ord.total_amount || 0), 0);
-      const totalOrders = (allOrders || []).length || 0;
-      const activeRetailers = new Set((allOrders || []).map((o: any) => o.pharmacy_id)).size;
-
-      // Count low stock items
-      let lowStockItems = 0;
-      const { data: productData } = await supabase
-        .from('products')
-        .select('id, stock, min_stock_level')
-        .eq('wholesaler_id', user.id);
-
-      if (productData) {
-        lowStockItems = productData.filter((prod: any) => Number(prod.stock) <= Number(prod.min_stock)).length;
-      }
-
-      setStats({
-        totalRevenue,
-        totalOrders,
-        activeRetailers,
-        lowStockItems
-      });
-
-      // 3. Generate analytics data from real data
-      const monthlyRevenue = await generateMonthlyRevenueData(allOrders || []);
-      const topProducts = await generateTopProductsData(user.id);
-      const orderTrends = await generateOrderTrendsData(allOrders || []);
-      const retailerDistribution = await generateRetailerDistributionData(allOrders || []);
-
-      setAnalyticsData({
-        monthlyRevenue,
-        topProducts,
-        orderTrends,
-        retailerDistribution
-      });
     }
 
     fetchWholesaleData();
-  }, [user, navigate]);
+  }, [user, navigate, toast]);
 
-  // Helper functions to generate real analytics data
-  const generateMonthlyRevenueData = async (orders: any[]) => {
+  const generateMonthlyRevenueData = (orders: any[]) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
     
-    const monthlyData = months.map((month, index) => {
+    return months.map((month, index) => {
       const monthOrders = orders.filter((order: any) => {
         const orderDate = new Date(order.created_at);
         return orderDate.getFullYear() === currentYear && orderDate.getMonth() === index;
       });
       
-      const revenue = monthOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0);
-      
       return {
         month,
-        revenue: revenue / 1000000, // Convert to millions
+        revenue: monthOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0) / 1000000,
         orders: monthOrders.length
       };
     });
-
-    return monthlyData;
   };
 
-  const generateTopProductsData = async (wholesalerId: string) => {
-    // Fetch order items with product information, join to orders for wholesaler_id
-    const { data: orderItems } = await supabase
-      .from('order_items')
-      .select(`
-        product_name,
-        quantity,
-        unit_price,
-        total_price,
-        order_id,
-        orders!inner(wholesaler_id)
-      `)
-      .eq('orders.wholesaler_id', wholesalerId);
-
-    if (!orderItems) return [];
-
-    // Group by product and calculate totals
-    const productTotals: Record<string, { name: string; quantity: number; revenue: number }> = {};
-    
-    orderItems.forEach((item: any) => {
-      const productName = item.product_name || 'Unknown Product';
-      if (!productTotals[productName]) {
-        productTotals[productName] = { name: productName, quantity: 0, revenue: 0 };
-      }
-      productTotals[productName].quantity += Number(item.quantity || 0);
-      productTotals[productName].revenue += Number(item.total_price || 0);
-    });
-
-    // Convert to array and sort by revenue
-    return Object.values(productTotals)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5)
-      .map((product, index) => ({
-        name: product.name,
-        value: product.revenue / 1000000, // Convert to millions
-        quantity: product.quantity,
-        color: COLORS[index % COLORS.length]
-      }));
-  };
-
-  const generateOrderTrendsData = async (orders: any[]) => {
+  const generateOrderTrendsData = (orders: any[]) => {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -249,376 +192,220 @@ const WholesaleDashboard = () => {
     });
   };
 
-  const generateRetailerDistributionData = async (orders: any[]) => {
-    const retailerCounts: Record<string, number> = {};
-    
-    orders.forEach((order: any) => {
-      const retailerId = order.pharmacy_id;
-      if (retailerId) {
-        retailerCounts[retailerId] = (retailerCounts[retailerId] || 0) + 1;
-      }
-    });
-
-    // Fetch retailer names
-    const retailerIds = Object.keys(retailerCounts);
-    let retailerNames: Record<string, string> = {};
-    
-    if (retailerIds.length > 0) {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, business_name, name')
-        .in('id', retailerIds);
-
-      profileData?.forEach((profile: any) => {
-        retailerNames[profile.id] = profile.business_name || profile.name || 'Unknown Retailer';
-      });
-    }
-
-    return Object.entries(retailerCounts)
-      .map(([id, count]) => ({
-        name: retailerNames[id] || 'Unknown Retailer',
-        value: count,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)]
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
-  };
-
-  const handleDownload = async (file_path: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from('reports')
-        .download(file_path);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file_path.split('/').pop() || 'report.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading report:', error);
-      toast({
-        title: "Download Failed",
-        description: "Failed to download the report. Please try again.",
-        variant: "destructive",
-      });
+  const getStatusVariant = (status: string): "success" | "warning" | "danger" | "info" | "default" => {
+    switch (status) {
+      case 'delivered': case 'completed': return 'success';
+      case 'pending': return 'warning';
+      case 'cancelled': return 'danger';
+      default: return 'info';
     }
   };
 
-  const handleGenerateReport = async (templateId: string) => {
-    generateReport({ templateId }, {
-      onSuccess: () => {
-        toast({
-          title: "Report Generated",
-          description: "Your report has been generated successfully.",
-        });
-        setReportModalOpen(false);
-      },
-      onError: (error) => {
-        toast({
-          title: "Generation Failed",
-          description: error.message || "Failed to generate report.",
-          variant: "destructive",
-        });
-      },
-    });
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-TZ', {
+      style: 'currency',
+      currency: 'TZS',
+      minimumFractionDigits: 0
+    }).format(amount);
   };
 
-  if (!user || user.role !== 'wholesale') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
-          <p className="text-gray-600 mb-4">You don't have permission to access this page.</p>
-          <Button onClick={() => navigate('/login')}>Go to Login</Button>
-        </div>
-      </div>
-    );
-  }
+  if (!user || user.role !== 'wholesale') return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Wholesale Dashboard
-            {selectedBranch && (
-              <span className="text-2xl font-normal text-gray-600 ml-4">
-                - {selectedBranch.name}
-              </span>
-            )}
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Manage your wholesale operations and track performance
-            {selectedBranch && ` for ${selectedBranch.name}`}
-          </p>
+    <DashboardLayout
+      title={`Wholesale Dashboard${selectedBranch ? ` - ${selectedBranch.name}` : ''}`}
+      subtitle="Manage your wholesale operations and track performance"
+      icon={<Package className="h-6 w-6" />}
+      badge="Wholesale"
+      isLoading={isLoading}
+      actions={
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Scan className="h-4 w-4" />
+              Scan Barcode
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <BarcodeScanner />
+          </DialogContent>
+        </Dialog>
+      }
+    >
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          title="Total Revenue"
+          value={formatCurrency(stats.totalRevenue)}
+          subtitle="All time"
+          icon={<DollarSign className="h-5 w-5" />}
+          variant="primary"
+        />
+        <StatsCard
+          title="Total Orders"
+          value={stats.totalOrders}
+          subtitle="Orders received"
+          icon={<Package className="h-5 w-5" />}
+          variant="info"
+        />
+        <StatsCard
+          title="Active Retailers"
+          value={stats.activeRetailers}
+          subtitle="Buying from you"
+          icon={<Users className="h-5 w-5" />}
+          variant="success"
+        />
+        <StatsCard
+          title="Low Stock Items"
+          value={stats.lowStockItems}
+          subtitle="Need reordering"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          variant={stats.lowStockItems > 0 ? "danger" : "default"}
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <DashboardSection
+        title="Quick Actions"
+        description="Manage your wholesale operations"
+        icon={<TrendingUp className="h-4 w-4" />}
+      >
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <QuickActionCard
+            title="Inventory Forecast"
+            description="Predict demand & optimize"
+            icon={<BarChart3 className="h-5 w-5" />}
+            href="/wholesale/forecast"
+            variant="primary"
+          />
+          <QuickActionCard
+            title="Branch Management"
+            description="Manage locations"
+            icon={<Building2 className="h-5 w-5" />}
+            href="/wholesale/branches"
+            variant="info"
+          />
+          <QuickActionCard
+            title="Branch Inventory"
+            description="Stock by branch"
+            icon={<BoxesIcon className="h-5 w-5" />}
+            href="/wholesale/branch-inventory"
+            variant="warning"
+          />
+          <QuickActionCard
+            title="Retailer Orders"
+            description="View all orders"
+            icon={<FileText className="h-5 w-5" />}
+            href="/wholesale/retailer-orders"
+            variant="success"
+          />
         </div>
+      </DashboardSection>
 
+      {/* Recent Orders */}
+      <DashboardSection
+        title="Recent Orders"
+        description="Latest orders from retailers"
+        icon={<Package className="h-4 w-4" />}
+        action={{ label: "View All", href: "/wholesale/orders" }}
+      >
+        {orders.length === 0 ? (
+          <EmptyStateCard
+            icon={<Package className="h-6 w-6" />}
+            title="No orders yet"
+            description="When retailers place orders, they'll appear here"
+          />
+        ) : (
+          <div className="space-y-3">
+            {orders.map((order) => (
+              <ActivityCard
+                key={order.id}
+                title={`Order #${order.order_number || order.id.slice(0, 8)}`}
+                subtitle={order.pharmacy_name || 'Unknown Retailer'}
+                timestamp={new Date(order.created_at).toLocaleDateString()}
+                status={{
+                  label: order.status?.replace(/-/g, ' ').toUpperCase() || 'PENDING',
+                  variant: getStatusVariant(order.status),
+                }}
+                icon={<Package className="h-5 w-5" />}
+                rightContent={
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatCurrency(order.total_amount)}
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        )}
+      </DashboardSection>
 
-        {/* Quick Access Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <Link to="/wholesale/forecast">
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-blue-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-blue-700">
-                  <span role="img" aria-label="Forecast">📈</span> Inventory Forecasting
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">Predict demand and optimize inventory management across all branches.</p>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link to="/wholesale/branches">
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-purple-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-purple-700">
-                  <span role="img" aria-label="Branches">🏢</span> Branch Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">Manage your branches, add new locations, and assign managers.</p>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link to="/wholesale/branch-inventory">
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow border-orange-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700">
-                  <span role="img" aria-label="Inventory">📦</span> Branch Inventory
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">Manage inventory for the selected branch.</p>
-              </CardContent>
-            </Card>
-          </Link>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow border-green-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-700">
-                    <span role="img" aria-label="Barcode">🔍</span> Barcode Scanner
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">Scan product barcodes to quickly manage inventory across branches.</p>
-                </CardContent>
-              </Card>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl w-full">
-              <BarcodeScanner />
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <WholesaleStatsCards stats={stats} />
-        <WholesaleQuickActions />
-        <WholesaleRecentOrders orders={orders} />
-
-        {/* Invoice Generator Section */}
-        <div className="mb-8">
-          <InvoiceGenerator />
-        </div>
-
-        {/* Analytics Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Monthly Revenue Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Monthly Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analyticsData.monthlyRevenue}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}M`, 'Revenue']} />
-                  <Bar dataKey="revenue" fill="#3B82F6" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Order Trends */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Order Trends (Last 7 Days)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={analyticsData.orderTrends}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="orders" stroke="#10B981" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Top Products and Retailer Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Top Products */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Top Products by Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={analyticsData.topProducts}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analyticsData.topProducts.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}M`, 'Revenue']} />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Retailer Distribution */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Top Retailers by Orders
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={analyticsData.retailerDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analyticsData.retailerDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => [value, 'Orders']} />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Automated Reporting */}
-        <Card className="mb-8">
+      {/* Analytics Charts */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card className="border-border">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Automated Reporting
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Monthly Revenue
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Report Templates */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Available Report Templates</h3>
-                <div className="space-y-3">
-                  {reportTemplates?.map((template) => (
-                    <div key={template.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-medium">{template.name}</h4>
-                        <p className="text-sm text-gray-600">{template.description}</p>
-                      </div>
-                      <Button
-                        onClick={() => handleGenerateReport(template.id)}
-                        disabled={isPending}
-                        size="sm"
-                      >
-                        {isPending ? 'Generating...' : 'Generate'}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Generated Reports */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Generated Reports</h3>
-                <div className="space-y-3">
-                  {loadingReports ? (
-                    <div className="text-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
-                      <p className="text-sm text-gray-600 mt-2">Loading reports...</p>
-                    </div>
-                  ) : generatedReports?.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">No reports generated yet.</p>
-                  ) : (
-                    generatedReports?.map((report) => (
-                      <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <h4 className="font-medium">{report.file_path.split('/').pop()}</h4>
-                          <p className="text-sm text-gray-600">
-                            Generated: {new Date(report.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => handleDownload(report.file_path)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Download
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={analyticsData.monthlyRevenue}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" className="text-muted-foreground" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis className="text-muted-foreground" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip 
+                  formatter={(value: number) => [`${value.toFixed(2)}M TZS`, 'Revenue']}
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    color: 'hsl(var(--foreground))'
+                  }}
+                />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Backup Schedule Manager */}
-        <BackupScheduleManager />
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <FileText className="h-5 w-5 text-primary" />
+              Order Trends (Last 7 Days)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={analyticsData.orderTrends}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="date" className="text-muted-foreground" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis className="text-muted-foreground" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <Tooltip
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                    color: 'hsl(var(--foreground))'
+                  }}
+                />
+                <Line type="monotone" dataKey="orders" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Report Generation Modal */}
-      <ReportModal
-        open={reportModalOpen}
-        onOpenChange={setReportModalOpen}
-        templates={reportTemplates || []}
-        onGenerateReport={({ templateId }) => handleGenerateReport(templateId)}
-        isLoading={isPending}
-      />
-    </div>
+      {/* Invoice Generator */}
+      <DashboardSection
+        title="Invoice Generator"
+        description="Create and manage invoices"
+        icon={<FileText className="h-4 w-4" />}
+      >
+        <InvoiceGenerator />
+      </DashboardSection>
+    </DashboardLayout>
   );
 };
 
