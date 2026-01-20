@@ -23,6 +23,7 @@ interface ConversationContext {
   therapeutic_goals: string[];
   session_count: number;
   language_preference: string;
+  recent_messages?: Array<{ role: string; content: string }>;
 }
 
 const crisisPhrases = [
@@ -479,14 +480,14 @@ serve(async (req: Request) => {
     context.recent_messages = conversationHistory;
 
     // Search knowledge base first
-    const knowledgeResults = await searchKnowledge(supabase, message, language, 2);
+    const knowledgeResults: Array<{ chunk_text: string; topic: string }> = await searchKnowledge(supabase, message, language, 2);
     
     let response: string;
     let usedKnowledge = false;
 
     if (knowledgeResults.length > 0) {
       // Use knowledge base + LLM for contextual response
-      const knowledgeContext = knowledgeResults.map(r => r.chunk_text).join('\n\n');
+      const knowledgeContext = knowledgeResults.map((r: { chunk_text: string; topic: string }) => r.chunk_text).join('\n\n');
       const contextualMessage = `Based on this information: ${knowledgeContext}\n\nUser question: ${message}`;
       
       response = await callGroqLLM(contextualMessage, context, language);
@@ -502,7 +503,7 @@ serve(async (req: Request) => {
       ...context,
       emotional_state: newEmotionalState,
       session_count: context.session_count + 1,
-      topics_discussed: [...new Set([...context.topics_discussed, ...knowledgeResults.map(r => r.topic).filter(Boolean)])]
+      topics_discussed: [...new Set([...context.topics_discussed, ...knowledgeResults.map((r: { chunk_text: string; topic: string }) => r.topic).filter(Boolean)])]
     };
 
     // Save messages and update context
