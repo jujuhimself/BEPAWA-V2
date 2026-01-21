@@ -331,9 +331,9 @@ export function InvoiceGenerator() {
   };
 
   return (
-    <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
-      <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
-        <CardTitle className="flex items-center gap-2 text-primary">
+    <Card className="shadow-lg border-0 bg-gradient-to-br from-background to-primary/5">
+      <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b border-border">
+        <CardTitle className="flex items-center gap-2 text-foreground">
           <span role="img" aria-label="Invoice">📄</span>
           Generate Invoice
         </CardTitle>
@@ -400,14 +400,14 @@ export function InvoiceGenerator() {
             )}
             
             {!loading && products.length === 0 && (
-              <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+              <div className="text-center py-8 border-2 border-dashed border-border rounded-lg bg-muted/20">
                 <p className="text-muted-foreground">No products available in inventory.</p>
                 <p className="text-sm text-muted-foreground mt-2">Add products to your inventory first.</p>
               </div>
             )}
             
             {!loading && products.length > 0 && invoiceData.items.length === 0 && (
-              <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+              <div className="text-center py-8 border-2 border-dashed border-border rounded-lg bg-muted/20">
                 <p className="text-muted-foreground">Click "Add Item" to start building your invoice.</p>
                 <p className="text-sm text-muted-foreground mt-2">{products.length} products available in inventory.</p>
               </div>
@@ -415,7 +415,7 @@ export function InvoiceGenerator() {
             
             <div className="space-y-4">
               {invoiceData.items.map((item) => (
-                <div key={item.id} className="flex gap-4 items-start bg-white border rounded-lg p-4">
+                <div key={item.id} className="flex gap-4 items-start bg-card border border-border rounded-lg p-4">
                   <div className="flex-grow grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <Label>Product</Label>
@@ -459,7 +459,7 @@ export function InvoiceGenerator() {
                         value={item.unitPrice}
                         onChange={(e) => updateItem(item.id, 'unitPrice', Number(e.target.value))}
                         readOnly
-                        className="bg-gray-50"
+                        className="bg-muted"
                       />
                     </div>
                     <div>
@@ -468,7 +468,7 @@ export function InvoiceGenerator() {
                         type="number"
                         value={item.total}
                         readOnly
-                        className="bg-gray-50 font-medium"
+                        className="bg-muted font-medium"
                       />
                     </div>
                   </div>
@@ -486,8 +486,8 @@ export function InvoiceGenerator() {
           </div>
 
           {/* Totals */}
-          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-            <h4 className="font-semibold text-gray-900">Invoice Summary</h4>
+          <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+            <h4 className="font-semibold text-foreground">Invoice Summary</h4>
             <div className="flex justify-between text-sm">
               <span>Subtotal:</span>
               <span>TZS {invoiceData.subtotal.toLocaleString()}</span>

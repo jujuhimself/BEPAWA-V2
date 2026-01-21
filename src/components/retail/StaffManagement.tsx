@@ -1,17 +1,19 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, User } from "lucide-react";
+import { Plus, Edit, Trash2, User, UserPlus, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import StaffInviteDialog from "@/components/staff/StaffInviteDialog";
+import { useBranches } from "@/hooks/useBranches";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type StaffMember = Database['public']['Tables']['staff_members']['Row'];
 type StaffMemberInsert = Database['public']['Tables']['staff_members']['Insert'];
@@ -46,8 +48,10 @@ const roleTemplates: Record<string, typeof defaultPermissions> = {
 const StaffManagement = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { branches } = useBranches();
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -87,45 +91,35 @@ const StaffManagement = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !editingStaff) return;
 
     try {
-      const staffData: StaffMemberInsert = {
-        ...formData,
-        pharmacy_id: user.id,
-        created_by: user.id,
-        is_active: true,
+      const staffData = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
         permissions: formData.permissions,
       };
 
-      if (editingStaff) {
-        const { error } = await supabase
-          .from('staff_members')
-          .update(staffData)
-          .eq('id', editingStaff.id);
+      const { error } = await supabase
+        .from('staff_members')
+        .update(staffData)
+        .eq('id', editingStaff.id);
 
-        if (error) throw error;
-        toast({ title: "Staff member updated successfully" });
-      } else {
-        const { error } = await supabase
-          .from('staff_members')
-          .insert(staffData);
-
-        if (error) throw error;
-        toast({ title: "Staff member added successfully" });
-      }
+      if (error) throw error;
+      toast({ title: "Staff member updated successfully" });
 
       setFormData({ name: '', email: '', role: 'pos-only', permissions: { ...roleTemplates['pos-only'] } });
-      setIsAddDialogOpen(false);
+      setIsEditDialogOpen(false);
       setEditingStaff(null);
       fetchStaff();
     } catch (error: any) {
-      console.error('Error saving staff member:', error);
+      console.error('Error updating staff member:', error);
       toast({
         title: "Error",
-        description: "Failed to save staff member",
+        description: "Failed to update staff member",
         variant: "destructive",
       });
     }
@@ -174,11 +168,11 @@ const StaffManagement = () => {
       role: staffMember.role,
       permissions: (typeof staffMember.permissions === 'object' ? staffMember.permissions : { ...roleTemplates['pos-only'] }) as typeof defaultPermissions,
     });
-    setIsAddDialogOpen(true);
+    setIsEditDialogOpen(true);
   };
 
-  const closeDialog = () => {
-    setIsAddDialogOpen(false);
+  const closeEditDialog = () => {
+    setIsEditDialogOpen(false);
     setEditingStaff(null);
     setFormData({ name: '', email: '', role: 'pos-only', permissions: { ...roleTemplates['pos-only'] } });
   };
@@ -192,82 +186,68 @@ const StaffManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Staff Management</h2>
-          <p className="text-gray-600">Manage your pharmacy staff and their permissions</p>
+          <p className="text-muted-foreground">Manage your pharmacy staff and their permissions</p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Staff Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="role">Role Template</Label>
-                <Select value={formData.role} onValueChange={(value: StaffMember['role']) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pos-only">POS Only - Can only use point of sale</SelectItem>
-                    <SelectItem value="inventory-only">Inventory Only - Can manage products</SelectItem>
-                    <SelectItem value="manager">Manager - POS + Inventory + Reports</SelectItem>
-                    <SelectItem value="admin">Admin - Full access</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Permissions</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {Object.keys(defaultPermissions).map((perm) => (
-                    <label key={perm} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.permissions[perm as keyof typeof defaultPermissions]}
-                        onChange={e => handlePermissionChange(perm as keyof typeof defaultPermissions, e.target.checked)}
-                      />
-                      {perm.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" className="flex-1">
-                  {editingStaff ? 'Update' : 'Add'} Staff Member
-                </Button>
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setIsInviteDialogOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Invite Staff Member
+        </Button>
       </div>
+
+      <StaffInviteDialog 
+        open={isInviteDialogOpen} 
+        onOpenChange={setIsInviteDialogOpen}
+        branches={branches}
+        onSuccess={fetchStaff}
+      />
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Staff Member</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="role">Role Template</Label>
+              <Select value={formData.role} onValueChange={(value: StaffMember['role']) => setFormData({ ...formData, role: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pos-only">POS Only</SelectItem>
+                  <SelectItem value="inventory-only">Inventory Only</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" className="flex-1">Update Staff Member</Button>
+              <Button type="button" variant="outline" onClick={closeEditDialog}>Cancel</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
@@ -292,8 +272,8 @@ const StaffManagement = () => {
             <TableBody>
               {staff.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                    No staff members found. Add your first staff member to get started.
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No staff members found. Invite your first staff member to get started.
                   </TableCell>
                 </TableRow>
               ) : (
