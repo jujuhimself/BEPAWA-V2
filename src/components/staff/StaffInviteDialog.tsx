@@ -91,29 +91,49 @@ const StaffInviteDialog = ({ open, onOpenChange, branches = [], onSuccess }: Sta
     setIsLoading(true);
     
     try {
-      // Check if user with this email already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
+      // Check if staff member with this email already exists for this pharmacy
+      const { data: existingStaff, error: existingError } = await supabase
+        .from('staff_members')
         .select('id, email')
+        .eq('pharmacy_id', user.id)
         .eq('email', formData.email.trim().toLowerCase())
-        .single();
+        .maybeSingle();
       
-      // Create staff member record
+      if (existingStaff) {
+        toast({
+          title: 'Staff Member Exists',
+          description: 'A staff member with this email already exists in your team.',
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Get the branch_id - use selected branch or null for main location
+      const branchId = formData.branchId && formData.branchId !== '' ? formData.branchId : null;
+      
+      // Create staff member record with all required fields
+      const staffData = {
+        name: formData.name,
+        email: formData.email.trim().toLowerCase(),
+        role: formData.role,
+        pharmacy_id: user.id, // Always use the pharmacy owner's ID
+        branch_id: branchId,
+        permissions: formData.permissions,
+        is_active: true,
+        created_by: user.id,
+      };
+
       const { data: staffMember, error: staffError } = await supabase
         .from('staff_members')
-        .insert({
-          name: formData.name,
-          email: formData.email.trim().toLowerCase(),
-          role: formData.role,
-          pharmacy_id: formData.branchId || user.id,
-          permissions: formData.permissions,
-          is_active: true,
-          created_by: user.id,
-        })
+        .insert(staffData)
         .select()
         .single();
       
-      if (staffError) throw staffError;
+      if (staffError) {
+        console.error('Staff member creation error:', staffError);
+        throw new Error(staffError.message || 'Failed to create staff member');
+      }
       
       // Send invitation email if enabled
       if (sendEmail) {

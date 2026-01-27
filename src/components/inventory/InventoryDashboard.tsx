@@ -11,8 +11,12 @@ import {
   Calendar,
   ShoppingCart,
   DollarSign,
-  Activity
+  Activity,
+  Upload,
+  QrCode
 } from "lucide-react";
+import BulkProductImport from './BulkProductImport';
+import BarcodeManager from './BarcodeManager';
 import { useProducts, useLowStockProducts, useExpiringProducts, useSalesAnalytics } from "@/hooks/useInventory";
 import { Link } from "react-router-dom";
 
@@ -127,11 +131,19 @@ const InventoryDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Alerts and Analytics */}
+      {/* Alerts, Analytics, Bulk Import, and Barcodes */}
       <Tabs defaultValue="alerts" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="bulk-import" className="flex items-center gap-1">
+            <Upload className="h-3 w-3" />
+            Bulk Import
+          </TabsTrigger>
+          <TabsTrigger value="barcodes" className="flex items-center gap-1">
+            <QrCode className="h-3 w-3" />
+            Barcodes
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="alerts" className="space-y-4">
@@ -254,6 +266,14 @@ const InventoryDashboard = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="bulk-import">
+          <BulkProductImport />
+        </TabsContent>
+
+        <TabsContent value="barcodes">
+          <BarcodeManager />
         </TabsContent>
       </Tabs>
     </div>

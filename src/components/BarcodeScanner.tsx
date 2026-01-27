@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Scan, Search, Package, AlertTriangle, Camera, CameraOff, RotateCcw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Scan, Search, Package, AlertTriangle, Camera, CameraOff, RotateCcw, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { inventoryService } from "@/services/inventoryService";
 import { useAuth } from "@/contexts/AuthContext";
-import QrReader from "react-qr-barcode-scanner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // Update Product interface to match backend fields
@@ -29,12 +29,47 @@ const BarcodeScanner = () => {
   const [loading, setLoading] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [lastScanned, setLastScanned] = useState<string | null>(null);
+  const [cameraPermission, setCameraPermission] = useState<'prompt' | 'granted' | 'denied' | 'unknown'>('unknown');
   const { toast } = useToast();
   const { user } = useAuth();
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [pendingBarcode, setPendingBarcode] = useState("");
   const [addProduct, setAddProduct] = useState({ name: '', barcode: '', price: '', category: '', stock: '', minStock: '' });
   const [addLoading, setAddLoading] = useState(false);
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+  const [QrReaderComponent, setQrReaderComponent] = useState<any>(null);
+
+  // Check camera permission status
+  useEffect(() => {
+    const checkPermission = async () => {
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          setCameraPermission(result.state as 'prompt' | 'granted' | 'denied');
+          result.onchange = () => {
+            setCameraPermission(result.state as 'prompt' | 'granted' | 'denied');
+          };
+        }
+      } catch (err) {
+        // Some browsers don't support camera permission query
+        setCameraPermission('unknown');
+      }
+    };
+    checkPermission();
+  }, []);
+
+  // Dynamically load QrReader only when needed
+  const loadQrReader = useCallback(async () => {
+    if (!QrReaderComponent) {
+      try {
+        const module = await import('react-qr-barcode-scanner');
+        setQrReaderComponent(() => module.default);
+      } catch (err) {
+        console.error('Failed to load barcode scanner:', err);
+        setCameraError('Failed to load barcode scanner component');
+      }
+    }
+  }, [QrReaderComponent]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -98,19 +133,69 @@ const BarcodeScanner = () => {
 
   const handleCameraError = (error: any) => {
     console.error("Camera error:", error);
-    setCameraError("Camera access denied or not available. Please check permissions.");
+    let errorMessage = "Camera access denied or not available.";
+    
+    if (error?.name === 'NotAllowedError') {
+      errorMessage = "Camera permission was denied. Please allow camera access in your browser settings.";
+      setCameraPermission('denied');
+    } else if (error?.name === 'NotFoundError') {
+      errorMessage = "No camera found on this device.";
+    } else if (error?.name === 'NotReadableError') {
+      errorMessage = "Camera is in use by another application.";
+    } else if (error?.name === 'OverconstrainedError') {
+      errorMessage = "Camera requirements could not be satisfied.";
+    }
+    
+    setCameraError(errorMessage);
     setIsScanning(false);
+    
+    // Clean up video stream
+    if (videoStream) {
+      videoStream.getTracks().forEach(track => track.stop());
+      setVideoStream(null);
+    }
   };
 
-  const handleCameraStart = () => {
+  // CRITICAL: Camera access must be triggered by direct user gesture
+  const handleCameraStart = async () => {
     setCameraError(null);
     setLastScanned(null);
-    setIsScanning(true);
+    
+    try {
+      // Load the QR reader component if not already loaded
+      await loadQrReader();
+      
+      // Request camera permission directly from user gesture
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
+      
+      setVideoStream(stream);
+      setCameraPermission('granted');
+      setIsScanning(true);
+      
+      toast({
+        title: "Camera Started",
+        description: "Point the camera at a barcode to scan",
+      });
+    } catch (error: any) {
+      handleCameraError(error);
+    }
   };
 
   const handleCameraStop = () => {
     setIsScanning(false);
     setCameraError(null);
+    
+    // Clean up video stream
+    if (videoStream) {
+      videoStream.getTracks().forEach(track => track.stop());
+      setVideoStream(null);
+    }
   };
 
   const simulateBarcodeScan = () => {
@@ -157,22 +242,43 @@ const BarcodeScanner = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Permission Info */}
+          {cameraPermission === 'denied' && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Camera access is blocked.</strong> To enable barcode scanning:
+                <ol className="list-decimal ml-4 mt-2 text-sm space-y-1">
+                  <li>Click the camera/lock icon in your browser's address bar</li>
+                  <li>Find the camera permission setting</li>
+                  <li>Change it to "Allow"</li>
+                  <li>Refresh the page</li>
+                </ol>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Camera Scanner */}
-          {isScanning && (
+          {isScanning && QrReaderComponent && (
             <div className="relative">
               <div className="border-2 border-dashed border-gray-300 rounded-lg overflow-hidden">
-                <QrReader
-                  onUpdate={(err, result) => {
+                <QrReaderComponent
+                  onUpdate={(err: any, result: any) => {
                     if (result) {
                       handleScan(result.getText());
                     }
-                    if (err) {
+                    // Only handle serious errors, not continuous "no barcode found" errors
+                    if (err && err.name && err.name !== 'NotFoundException') {
                       handleCameraError(err);
                     }
                   }}
                   onError={handleCameraError}
-                  width={"100%"}
-                  height={300}
+                  constraints={{ 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                  }}
+                  videoStyle={{ width: '100%', height: '300px', objectFit: 'cover' }}
                 />
               </div>
               <div className="absolute top-2 right-2">
@@ -192,23 +298,33 @@ const BarcodeScanner = () => {
 
           {/* Camera Controls */}
           {!isScanning && (
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleCameraStart}
-                className="flex-1"
-                disabled={loading}
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Start Camera Scanner
-              </Button>
-              <Button 
-                onClick={simulateBarcodeScan}
-                variant="outline"
-                disabled={loading || products.length === 0}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Demo Scan
-              </Button>
+            <div className="space-y-3">
+              {cameraPermission === 'prompt' && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Click "Start Camera" to enable barcode scanning. Your browser will ask for camera permission.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleCameraStart}
+                  className="flex-1"
+                  disabled={loading || cameraPermission === 'denied'}
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  {cameraPermission === 'denied' ? 'Camera Blocked' : 'Start Camera Scanner'}
+                </Button>
+                <Button 
+                  onClick={simulateBarcodeScan}
+                  variant="outline"
+                  disabled={loading || products.length === 0}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Demo Scan
+                </Button>
+              </div>
             </div>
           )}
 
