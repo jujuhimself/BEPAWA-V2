@@ -40,10 +40,16 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const defaultCenter: [number, number] = [35.7516, -6.1630];
 
   useEffect(() => {
-    const token = import.meta.env.VITE_MAPBOX_TOKEN || null;
+    // Try multiple ways to get the token
+    const token = import.meta.env.VITE_MAPBOX_TOKEN || 
+                  (window as any).VITE_MAPBOX_TOKEN ||
+                  'pk.eyJ1IjoicGhpbGlwcG93YSIsImEiOiJjbWF0cnZhY3UxcHBoMmtzb2h1Y2ZncXg0In0.sU2EF14oJVNcE_QNqYoQ5w'; // Fallback token from .env
+    
+    console.log('Mapbox token loaded:', token ? 'Yes' : 'No');
     setMapboxToken(token);
+    
     if (!token) {
-      setError('Map configuration pending');
+      setError('Map configuration pending - no token found');
       setIsLoading(false);
     }
   }, []);
@@ -224,8 +230,8 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     );
   };
 
-  // Fallback UI when map is not available
-  if (error || !mapboxToken) {
+  // Fallback UI when map is not available - but still show map container for loading
+  if (error && !mapboxToken) {
     return (
       <Card>
         <CardContent className="p-4 space-y-4">
