@@ -1,14 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Scan, Search, Package, AlertTriangle, Camera, CameraOff, RotateCcw, Info } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Scan, Search, Package, AlertTriangle, Camera, CameraOff, RotateCcw, Info, ImagePlus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { inventoryService } from "@/services/inventoryService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
 // Update Product interface to match backend fields
 interface Product {
@@ -38,6 +40,19 @@ const BarcodeScanner = () => {
   const [addLoading, setAddLoading] = useState(false);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [QrReaderComponent, setQrReaderComponent] = useState<any>(null);
+  
+  // Image upload state
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const barcodeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Initialize barcode reader for image scanning
+  useEffect(() => {
+    barcodeReaderRef.current = new BrowserMultiFormatReader();
+    return () => {
+      barcodeReaderRef.current = null;
+    };
+  }, []);
 
   // Check camera permission status
   useEffect(() => {
@@ -198,6 +213,68 @@ const BarcodeScanner = () => {
     }
   };
 
+  // Handle image upload for barcode scanning
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !barcodeReaderRef.current) return;
+    
+    setIsProcessingImage(true);
+    setCameraError(null);
+    
+    try {
+      // Create image URL from file
+      const imageUrl = URL.createObjectURL(file);
+      
+      // Create image element
+      const img = new Image();
+      img.src = imageUrl;
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      
+      // Decode barcode from image
+      try {
+        const result = await barcodeReaderRef.current.decodeFromImageElement(img);
+        const code = result.getText();
+        
+        toast({
+          title: "Barcode Detected!",
+          description: `Found code: ${code}`,
+        });
+        
+        handleScan(code);
+      } catch (decodeError: any) {
+        if (decodeError instanceof NotFoundException) {
+          toast({
+            title: "No Barcode Found",
+            description: "Could not detect a barcode in the image. Try a clearer photo.",
+            variant: "destructive",
+          });
+        } else {
+          throw decodeError;
+        }
+      }
+      
+      // Clean up
+      URL.revokeObjectURL(imageUrl);
+    } catch (error: any) {
+      console.error('Image barcode scan error:', error);
+      toast({
+        title: "Scan Failed",
+        description: "Failed to scan barcode from image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingImage(false);
+      // Reset file input
+      if (imageInputRef.current) {
+        imageInputRef.current.value = '';
+      }
+    }
+  };
+
   const simulateBarcodeScan = () => {
     if (products.length === 0) return;
     const randomProduct = products[Math.floor(Math.random() * products.length)];
@@ -328,12 +405,52 @@ const BarcodeScanner = () => {
             </div>
           )}
 
+          {/* Image Upload Alternative */}
+          <Card className="border-2 border-dashed border-muted-foreground/25">
+            <CardContent className="p-4">
+              <div className="text-center">
+                <ImagePlus className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <h4 className="font-medium mb-1">Scan from Image</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Upload a photo of a barcode if camera isn't working
+                </p>
+                <Input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageUpload}
+                  disabled={isProcessingImage || loading}
+                  className="hidden"
+                  id="barcode-image-upload"
+                />
+                <Label htmlFor="barcode-image-upload" className="cursor-pointer">
+                  <Button asChild disabled={isProcessingImage || loading} variant="outline" className="w-full">
+                    <span>
+                      {isProcessingImage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ImagePlus className="w-4 h-4 mr-2" />
+                          Upload Barcode Image
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Camera Error */}
           {cameraError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm">{cameraError}</p>
               <p className="text-red-600 text-xs mt-1">
-                Try refreshing the page or check browser camera permissions.
+                Try the image upload option above, or refresh the page.
               </p>
             </div>
           )}

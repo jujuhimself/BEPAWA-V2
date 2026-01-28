@@ -1,10 +1,12 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Star, Clock, Phone, Navigation } from "lucide-react";
+import { MapPin, Star, Clock, Phone, Navigation, ShoppingCart, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface Pharmacy {
   id: string;
@@ -20,71 +22,119 @@ interface Pharmacy {
 
 const PharmacyFinder = () => {
   const [searchLocation, setSearchLocation] = useState("");
-  const [pharmacies] = useState<Pharmacy[]>([
-    {
-      id: "1",
-      name: "City Pharmacy",
-      address: "Kisutu Street, Dar es Salaam",
-      phone: "+255 22 211 3456",
-      rating: 4.8,
-      distance: "0.5 km",
-      isOpen: true,
-      operatingHours: "8:00 AM - 10:00 PM",
-      services: ["Prescription", "OTC Medicines", "Consultation", "Delivery"]
-    },
-    {
-      id: "2",
-      name: "HealthCare Plus Pharmacy",
-      address: "Samora Avenue, Dar es Salaam",
-      phone: "+255 22 266 7890",
-      rating: 4.6,
-      distance: "1.2 km",
-      isOpen: true,
-      operatingHours: "7:00 AM - 9:00 PM",
-      services: ["Prescription", "OTC Medicines", "Medical Equipment"]
-    },
-    {
-      id: "3",
-      name: "MediPoint Pharmacy",
-      address: "Uhuru Street, Dar es Salaam",
-      phone: "+255 22 212 4567",
-      rating: 4.7,
-      distance: "2.1 km",
-      isOpen: false,
-      operatingHours: "9:00 AM - 8:00 PM",
-      services: ["Prescription", "OTC Medicines", "Health Checkup"]
-    },
-    {
-      id: "4",
-      name: "Wellness Pharmacy",
-      address: "Posta Street, Dar es Salaam",
-      phone: "+255 22 218 9012",
-      rating: 4.5,
-      distance: "3.0 km",
-      isOpen: true,
-      operatingHours: "8:30 AM - 9:30 PM",
-      services: ["Prescription", "OTC Medicines", "Consultation", "Lab Tests"]
-    }
-  ]);
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Fetch real pharmacies from Supabase
+  useEffect(() => {
+    const fetchPharmacies = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'retail')
+          .eq('is_approved', true)
+          .limit(20);
+
+        if (error) throw error;
+
+        // Map to Pharmacy interface
+        const mappedPharmacies: Pharmacy[] = (data || []).map((profile: any) => ({
+          id: profile.id,
+          name: profile.pharmacy_name || profile.business_name || profile.name || 'Pharmacy',
+          address: profile.address || `${profile.city || ''}, ${profile.region || 'Tanzania'}`.trim().replace(/^,\s*/, ''),
+          phone: profile.phone || 'N/A',
+          rating: 4.5 + Math.random() * 0.5, // Placeholder rating
+          distance: `${(Math.random() * 5).toFixed(1)} km`, // Placeholder distance
+          isOpen: true, // Default to open
+          operatingHours: profile.operating_hours || "8:00 AM - 9:00 PM",
+          services: ["Prescription", "OTC Medicines", "Delivery"]
+        }));
+
+        setPharmacies(mappedPharmacies);
+      } catch (error) {
+        console.error('Error fetching pharmacies:', error);
+        // Fallback to sample data if fetch fails
+        setPharmacies([
+          {
+            id: "sample-1",
+            name: "City Pharmacy",
+            address: "Kisutu Street, Dar es Salaam",
+            phone: "+255 22 211 3456",
+            rating: 4.8,
+            distance: "0.5 km",
+            isOpen: true,
+            operatingHours: "8:00 AM - 10:00 PM",
+            services: ["Prescription", "OTC Medicines", "Consultation", "Delivery"]
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPharmacies();
+  }, []);
 
   const handleGetCurrentLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         () => {
           setSearchLocation("Current Location");
+          toast({
+            title: "Location Found",
+            description: "Using your current location",
+          });
         },
         () => {
-          alert("Unable to get your location. Please enter manually.");
+          toast({
+            title: "Location Error",
+            description: "Unable to get your location. Please enter manually.",
+            variant: "destructive",
+          });
         }
       );
     }
   };
 
+  const handleViewProducts = (pharmacyId: string) => {
+    // Navigate to the pharmacy store page
+    navigate(`/pharmacy-store/${pharmacyId}`);
+  };
+
+  const handleCall = (phone: string) => {
+    window.location.href = `tel:${phone}`;
+  };
+
+  const handleDirections = (address: string) => {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank');
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            Find Nearby Pharmacies
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2">Loading pharmacies...</span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-blue-600" />
+          <MapPin className="h-5 w-5 text-primary" />
           Find Nearby Pharmacies
         </CardTitle>
       </CardHeader>
@@ -107,6 +157,15 @@ const PharmacyFinder = () => {
           </Button>
         </div>
 
+        {/* Empty State */}
+        {pharmacies.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No pharmacies found in your area.</p>
+            <p className="text-sm">Try searching a different location.</p>
+          </div>
+        )}
+
         {/* Pharmacy List */}
         <div className="space-y-4">
           {pharmacies.map((pharmacy) => (
@@ -115,11 +174,11 @@ const PharmacyFinder = () => {
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">{pharmacy.name}</h3>
-                    <p className="text-gray-600 text-sm flex items-center gap-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
                       {pharmacy.address}
                     </p>
-                    <p className="text-gray-600 text-sm flex items-center gap-1 mt-1">
+                    <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
                       <Phone className="h-3 w-3" />
                       {pharmacy.phone}
                     </p>
@@ -127,9 +186,9 @@ const PharmacyFinder = () => {
                   <div className="text-right">
                     <div className="flex items-center gap-1 mb-1">
                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span className="font-medium">{pharmacy.rating}</span>
+                      <span className="font-medium">{pharmacy.rating.toFixed(1)}</span>
                     </div>
-                    <p className="text-sm text-gray-500">{pharmacy.distance}</p>
+                    <p className="text-sm text-muted-foreground">{pharmacy.distance}</p>
                   </div>
                 </div>
 
@@ -139,7 +198,7 @@ const PharmacyFinder = () => {
                     <Clock className="h-3 w-3 mr-1" />
                     {pharmacy.isOpen ? "Open" : "Closed"}
                   </Badge>
-                  <span className="text-sm text-gray-600">{pharmacy.operatingHours}</span>
+                  <span className="text-sm text-muted-foreground">{pharmacy.operatingHours}</span>
                 </div>
 
                 {/* Services */}
@@ -156,13 +215,26 @@ const PharmacyFinder = () => {
 
                 {/* Actions */}
                 <div className="flex gap-2">
-                  <Button size="sm" className="flex-1">
+                  <Button 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => handleViewProducts(pharmacy.id)}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
                     View Products
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleCall(pharmacy.phone)}
+                  >
                     Call
                   </Button>
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleDirections(pharmacy.address)}
+                  >
                     Directions
                   </Button>
                 </div>
