@@ -126,6 +126,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Check and link staff invitation on registration/login
+  const checkAndLinkStaffInvitation = async (userId: string, email: string) => {
+    try {
+      // Find any pending staff invitation for this email
+      const { data: staffInvitation, error } = await supabase
+        .from('staff_members')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .is('user_id', null)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking staff invitation:', error);
+        return null;
+      }
+
+      if (staffInvitation) {
+        // Link the user to the staff member record
+        const { error: updateError } = await supabase
+          .from('staff_members')
+          .update({
+            user_id: userId,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', staffInvitation.id);
+
+        if (updateError) {
+          console.error('Error linking staff member:', updateError);
+          return null;
+        }
+
+        console.log('Staff invitation linked successfully:', staffInvitation);
+        return staffInvitation;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in checkAndLinkStaffInvitation:', error);
+      return null;
+    }
+  };
+
   // Create UserSubscription from profile
   const createUserSubscription = (profile: any): UserSubscription | null => {
     if (!profile.subscription_status) return null;
@@ -179,6 +222,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(async () => {
             const profile = await fetchUserProfile(session.user.id);
             if (profile) {
+              // Check and link any pending staff invitation
+              const staffInvitation = await checkAndLinkStaffInvitation(
+                session.user.id, 
+                session.user.email || profile.email
+              );
+              
+              if (staffInvitation) {
+                console.log('User linked to pharmacy:', staffInvitation.pharmacy_id);
+              }
+
               // Initialize complimentary subscription if none exists
               if (!profile.subscription_status) {
                 await initializeComplimentarySubscription(session.user.id);
@@ -211,6 +264,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (session?.user) {
         fetchUserProfile(session.user.id).then(async profile => {
           if (profile) {
+            // Check and link any pending staff invitation
+            await checkAndLinkStaffInvitation(
+              session.user.id, 
+              session.user.email || profile.email
+            );
+
             // Initialize complimentary subscription if none exists
             if (!profile.subscription_status) {
               await initializeComplimentarySubscription(session.user.id);
