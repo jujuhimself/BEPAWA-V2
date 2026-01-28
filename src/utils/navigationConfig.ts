@@ -65,6 +65,7 @@ export class NavigationMenuConfig {
       ],
       retail: [
         { label: "Dashboard", icon: React.createElement(Home, { className: "w-4 h-4" }), href: "/pharmacy" },
+        { label: "Inventory Dashboard", icon: React.createElement(BarChart3, { className: "w-4 h-4" }), href: "/inventory-dashboard" },
         { label: "Inventory", icon: React.createElement(Package, { className: "w-4 h-4" }), href: "/inventory-management" },
         { label: "Browse Products", icon: React.createElement(Package, { className: "w-4 h-4" }), href: "/catalog" },
         { label: "Wholesale Orders", icon: React.createElement(Truck, { className: "w-4 h-4" }), href: "/wholesale-ordering" },
@@ -80,6 +81,7 @@ export class NavigationMenuConfig {
       ],
       wholesale: [
         { label: "Dashboard", icon: React.createElement(Home, { className: "w-4 h-4" }), href: "/wholesale" },
+        { label: "Inventory Dashboard", icon: React.createElement(BarChart3, { className: "w-4 h-4" }), href: "/inventory-dashboard" },
         { label: "Inventory", icon: React.createElement(Package, { className: "w-4 h-4" }), href: "/wholesale/inventory" },
         { label: "Retailer Orders", icon: React.createElement(Users, { className: "w-4 h-4" }), href: "/wholesale/retailer-orders" },
         { label: "Purchase Orders", icon: React.createElement(FileText, { className: "w-4 h-4" }), href: "/wholesale/purchase-orders" },
@@ -116,7 +118,8 @@ export class NavigationMenuConfig {
       "User Management": "Administration", 
       "Audit Logs": "Administration",
       "Inventory": "Inventory",
-      "Browse Products": "Inventory", 
+      "Inventory Dashboard": "Inventory",
+      "Browse Products": "Inventory",
       "Wholesale Orders": "Orders",
       "Cart": "Orders",
       "Orders": "Orders",

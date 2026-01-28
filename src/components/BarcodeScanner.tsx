@@ -58,14 +58,20 @@ const BarcodeScanner = () => {
   useEffect(() => {
     const checkPermission = async () => {
       try {
+        console.log('BarcodeScanner - Checking camera permissions...');
         if (navigator.permissions && navigator.permissions.query) {
           const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          console.log('BarcodeScanner - Camera permission state:', result.state);
           setCameraPermission(result.state as 'prompt' | 'granted' | 'denied');
           result.onchange = () => {
+            console.log('BarcodeScanner - Camera permission changed to:', result.state);
             setCameraPermission(result.state as 'prompt' | 'granted' | 'denied');
           };
+        } else {
+          console.log('BarcodeScanner - Permissions API not supported');
         }
       } catch (err) {
+        console.log('BarcodeScanner - Error checking permissions:', err);
         // Some browsers don't support camera permission query
         setCameraPermission('unknown');
       }
@@ -173,31 +179,35 @@ const BarcodeScanner = () => {
 
   // CRITICAL: Camera access must be triggered by direct user gesture
   const handleCameraStart = async () => {
+    console.log('BarcodeScanner - Starting camera...');
     setCameraError(null);
     setLastScanned(null);
-    
+
     try {
       // Load the QR reader component if not already loaded
       await loadQrReader();
-      
+
+      console.log('BarcodeScanner - Requesting camera access...');
       // Request camera permission directly from user gesture
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
-        } 
+        }
       });
-      
+
+      console.log('BarcodeScanner - Camera access granted');
       setVideoStream(stream);
       setCameraPermission('granted');
       setIsScanning(true);
-      
+
       toast({
         title: "Camera Started",
         description: "Point the camera at a barcode to scan",
       });
     } catch (error: any) {
+      console.log('BarcodeScanner - Camera start failed:', error);
       handleCameraError(error);
     }
   };
@@ -216,36 +226,51 @@ const BarcodeScanner = () => {
   // Handle image upload for barcode scanning
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !barcodeReaderRef.current) return;
-    
+    console.log('BarcodeScanner - Image upload started, file:', file?.name, 'size:', file?.size);
+    if (!file || !barcodeReaderRef.current) {
+      console.log('BarcodeScanner - No file or no barcode reader');
+      return;
+    }
+
     setIsProcessingImage(true);
     setCameraError(null);
-    
+
     try {
+      console.log('BarcodeScanner - Creating image URL...');
       // Create image URL from file
       const imageUrl = URL.createObjectURL(file);
-      
+
       // Create image element
       const img = new Image();
       img.src = imageUrl;
-      
+
+      console.log('BarcodeScanner - Loading image...');
       await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
+        img.onload = () => {
+          console.log('BarcodeScanner - Image loaded, dimensions:', img.width, 'x', img.height);
+          resolve(void 0);
+        };
+        img.onerror = (err) => {
+          console.log('BarcodeScanner - Image load error:', err);
+          reject(err);
+        };
       });
-      
+
+      console.log('BarcodeScanner - Decoding barcode from image...');
       // Decode barcode from image
       try {
         const result = await barcodeReaderRef.current.decodeFromImageElement(img);
         const code = result.getText();
-        
+        console.log('BarcodeScanner - Barcode detected:', code);
+
         toast({
           title: "Barcode Detected!",
           description: `Found code: ${code}`,
         });
-        
+
         handleScan(code);
       } catch (decodeError: any) {
+        console.log('BarcodeScanner - Decode error:', decodeError);
         if (decodeError instanceof NotFoundException) {
           toast({
             title: "No Barcode Found",

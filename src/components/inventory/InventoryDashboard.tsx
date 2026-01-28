@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Package, 
-  AlertTriangle, 
-  TrendingUp, 
+import {
+  Package,
+  AlertTriangle,
+  TrendingUp,
   TrendingDown,
   Calendar,
   ShoppingCart,
@@ -19,12 +19,19 @@ import BulkProductImport from './BulkProductImport';
 import BarcodeManager from './BarcodeManager';
 import { useProducts, useLowStockProducts, useExpiringProducts, useSalesAnalytics } from "@/hooks/useInventory";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const InventoryDashboard = () => {
+  const { user } = useAuth();
   const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: lowStockProducts = [] } = useLowStockProducts();
   const { data: expiringProducts = [] } = useExpiringProducts();
   const { data: salesData = [] } = useSalesAnalytics();
+
+  // Debug logging
+  console.log('InventoryDashboard - User role:', user?.role);
+  console.log('InventoryDashboard - Products loading:', productsLoading);
+  console.log('InventoryDashboard - Products count:', products.length);
 
   const totalValue = products.reduce((sum, product) => sum + (product.stock * product.buy_price), 0);
   const totalProfit = products.reduce((sum, product) => sum + (product.stock * (product.sell_price - product.buy_price)), 0);
