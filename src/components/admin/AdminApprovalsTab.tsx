@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +6,7 @@ import { ShieldCheck, UserCheck, UserX, Eye, CheckCircle } from "lucide-react";
 import { UserAccount } from "@/types/userAccount";
 import UserProfileDrawer from "./UserProfileDrawer";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   pendingUsers: UserAccount[];
@@ -18,7 +17,7 @@ interface Props {
 }
 
 const roles = [
-  { label: "All", value: "" },
+  { label: "All Roles", value: "all" },
   { label: "Retail", value: "retail" },
   { label: "Wholesale", value: "wholesale" },
   { label: "Lab", value: "lab" },
@@ -33,14 +32,14 @@ const AdminApprovalsTab: React.FC<Props> = ({
   getStatusBadge,
 }) => {
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [drawerUser, setDrawerUser] = useState<UserAccount | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return pendingUsers.filter(u =>
       (u.name + u.email + (u.businessName || "")).toLowerCase().includes(search.toLowerCase()) &&
-      (roleFilter ? u.role === roleFilter : true)
+      (roleFilter === 'all' ? true : u.role === roleFilter)
     );
   }, [pendingUsers, search, roleFilter]);
 
@@ -66,15 +65,20 @@ const AdminApprovalsTab: React.FC<Props> = ({
             onChange={e => setSearch(e.target.value)}
           />
           <Select value={roleFilter} onValueChange={setRoleFilter}>
-            {roles.map(r =>
-              <option value={r.value} key={r.value}>{r.label}</option>
-            )}
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map(r => (
+                <SelectItem value={r.value} key={r.value}>{r.label}</SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
         {filtered.length === 0 ? (
           <div className="text-center py-8">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-            <p className="text-gray-600">No pending approvals</p>
+            <p className="text-muted-foreground">No pending approvals</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -85,18 +89,18 @@ const AdminApprovalsTab: React.FC<Props> = ({
                     {getRoleIcon(user.role)}
                     <div>
                       <h4 className="font-semibold">{user.businessName || user.name}</h4>
-                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="capitalize">{user.role}</Badge>
                         {getStatusBadge(user.status)}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         Registered: {user.registeredAt}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-500">Registered</p>
+                    <p className="text-xs text-muted-foreground">Registered</p>
                     <p className="text-sm font-medium">{user.registeredAt}</p>
                   </div>
                 </div>
