@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +6,7 @@ import { Eye, Settings } from "lucide-react";
 import { UserAccount } from "@/types/userAccount";
 import UserProfileDrawer from "./UserProfileDrawer";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Props {
   allUsers: UserAccount[];
@@ -16,7 +15,7 @@ interface Props {
 }
 
 const roles = [
-  { label: "All", value: "" },
+  { label: "All Roles", value: "all" },
   { label: "Retail", value: "retail" },
   { label: "Wholesale", value: "wholesale" },
   { label: "Lab", value: "lab" },
@@ -24,7 +23,7 @@ const roles = [
 ];
 
 const statuses = [
-  { label: "All", value: "" },
+  { label: "All Statuses", value: "all" },
   { label: "Pending", value: "pending" },
   { label: "Approved", value: "approved" },
   { label: "Rejected", value: "rejected" }
@@ -36,16 +35,16 @@ const AdminUsersTab: React.FC<Props> = ({
   getStatusBadge,
 }) => {
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filteredUsers = useMemo(() => {
     return allUsers.filter((user) => {
       const matchSearch = (user.name + user.email + (user.businessName || "")).toLowerCase().includes(search.toLowerCase());
-      const matchRole = roleFilter ? user.role === roleFilter : true;
-      const matchStatus = statusFilter ? user.status === statusFilter : true;
+      const matchRole = roleFilter === 'all' ? true : user.role === roleFilter;
+      const matchStatus = statusFilter === 'all' ? true : user.status === statusFilter;
       return matchSearch && matchRole && matchStatus;
     });
   }, [allUsers, search, roleFilter, statusFilter]);
@@ -68,21 +67,25 @@ const AdminUsersTab: React.FC<Props> = ({
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <Select
-            value={roleFilter}
-            onValueChange={setRoleFilter}
-          >
-            {roles.map(r =>
-              <option value={r.value} key={r.value}>{r.label}</option>
-            )}
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map(r => (
+                <SelectItem value={r.value} key={r.value}>{r.label}</SelectItem>
+              ))}
+            </SelectContent>
           </Select>
-          <Select
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-          >
-            {statuses.map(s =>
-              <option value={s.value} key={s.value}>{s.label}</option>
-            )}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {statuses.map(s => (
+                <SelectItem value={s.value} key={s.value}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
         <div className="space-y-4">
@@ -92,13 +95,12 @@ const AdminUsersTab: React.FC<Props> = ({
                 {getRoleIcon(user.role)}
                 <div>
                   <h4 className="font-semibold">{user.businessName || user.name}</h4>
-                  <p className="text-sm text-gray-600">{user.email}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     <Badge variant="outline" className="capitalize">{user.role}</Badge>
                     {getStatusBadge(user.status)}
                   </div>
-                  {/* Add additional row details */}
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     Registered: {user.registeredAt}
                   </div>
                 </div>

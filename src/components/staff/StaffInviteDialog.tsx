@@ -110,7 +110,7 @@ const StaffInviteDialog = ({ open, onOpenChange, branches = [], onSuccess }: Sta
       }
 
       // Get the branch_id - use selected branch or null for main location
-      const branchId = formData.branchId && formData.branchId !== '' ? formData.branchId : null;
+      const branchId = formData.branchId && formData.branchId !== '' && formData.branchId !== 'main' ? formData.branchId : null;
       
       // Create staff member record with all required fields
       const staffData = {
@@ -292,7 +292,7 @@ const StaffInviteDialog = ({ open, onOpenChange, branches = [], onSuccess }: Sta
                   <SelectValue placeholder="Select a branch (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Main Location</SelectItem>
+                  <SelectItem value="main">Main Location</SelectItem>
                   {branches.map(branch => (
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name} ({branch.type})
