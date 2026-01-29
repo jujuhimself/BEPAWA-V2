@@ -1,9 +1,17 @@
+/// <reference types="@types/google.maps" />
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MapPin, Locate, Search, AlertCircle, Check } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { MapPin, Locate, Search, AlertCircle, Check, Loader2 } from 'lucide-react';
+
+// Extend Window interface for Google Maps
+declare global {
+  interface Window {
+    google: typeof google;
+    initGoogleMaps: () => void;
+  }
+}
 
 export interface LocationData {
   latitude: number;
@@ -19,6 +27,34 @@ interface LocationPickerProps {
   placeholder?: string;
 }
 
+// Load Google Maps script dynamically
+const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (window.google?.maps?.places) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve());
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMaps`;
+    script.async = true;
+    script.defer = true;
+
+    (window as any).initGoogleMaps = () => {
+      resolve();
+    };
+
+    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+    document.head.appendChild(script);
+  });
+};
+
 const LocationPicker: React.FC<LocationPickerProps> = ({
   onLocationSelect,
   initialLocation,
@@ -26,92 +62,128 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   placeholder = 'Search for your delivery location...'
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<any>(null);
-  const marker = useRef<any>(null);
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const pharmacyMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(initialLocation || null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
   // Default to Dodoma, Tanzania
-  const defaultCenter: [number, number] = [35.7516, -6.1630];
+  const defaultCenter = { lat: -6.1630, lng: 35.7516 };
+
+  // Get the API key from Supabase edge function
+  const [apiKey, setApiKey] = useState<string | null>(null);
 
   useEffect(() => {
-    // Try multiple ways to get the token
-    const token = import.meta.env.VITE_MAPBOX_TOKEN || 
-                  (window as any).VITE_MAPBOX_TOKEN ||
-                  'pk.eyJ1IjoicGhpbGlwcG93YSIsImEiOiJjbWF0cnZhY3UxcHBoMmtzb2h1Y2ZncXg0In0.sU2EF14oJVNcE_QNqYoQ5w'; // Fallback token from .env
-    
-    console.log('Mapbox token loaded:', token ? 'Yes' : 'No');
-    setMapboxToken(token);
-    
-    if (!token) {
-      setError('Map configuration pending - no token found');
-      setIsLoading(false);
-    }
+    // Fetch API key from edge function
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch(
+          `https://frgblvloxhcnwrgvjazk.supabase.co/functions/v1/google-maps-config`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (!response.ok) throw new Error('Failed to fetch API key');
+        const data = await response.json();
+        setApiKey(data.apiKey);
+      } catch (err) {
+        console.error('Error fetching Google Maps API key:', err);
+        setError('Map configuration pending');
+        setIsLoading(false);
+      }
+    };
+
+    fetchApiKey();
   }, []);
 
   useEffect(() => {
-    if (!mapboxToken || !mapContainer.current) return;
+    if (!apiKey) return;
+
+    loadGoogleMapsScript(apiKey)
+      .then(() => {
+        setIsScriptLoaded(true);
+      })
+      .catch((err) => {
+        console.error('Error loading Google Maps:', err);
+        setError('Failed to load maps');
+        setIsLoading(false);
+      });
+  }, [apiKey]);
+
+  useEffect(() => {
+    if (!isScriptLoaded || !mapContainer.current || !window.google) return;
 
     const initializeMap = async () => {
       try {
-        const mapboxgl = (await import('mapbox-gl')).default;
-        await import('mapbox-gl/dist/mapbox-gl.css');
-
-        mapboxgl.accessToken = mapboxToken;
-
-        const center = initialLocation 
-          ? [initialLocation.longitude, initialLocation.latitude] as [number, number]
+        const center = initialLocation
+          ? { lat: initialLocation.latitude, lng: initialLocation.longitude }
           : defaultCenter;
 
-        map.current = new mapboxgl.Map({
-          container: mapContainer.current!,
-          style: 'mapbox://styles/mapbox/streets-v12',
+        // Initialize the map
+        mapRef.current = new google.maps.Map(mapContainer.current!, {
           center,
           zoom: 14,
+          mapId: 'bepawa-delivery-map',
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
         });
 
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        // Create draggable marker using AdvancedMarkerElement
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+        
+        const markerContent = document.createElement('div');
+        markerContent.innerHTML = '📍';
+        markerContent.style.fontSize = '40px';
+        markerContent.style.cursor = 'grab';
 
-        // Add draggable marker
-        const markerEl = document.createElement('div');
-        markerEl.innerHTML = '📍';
-        markerEl.style.fontSize = '40px';
-        markerEl.style.cursor = 'grab';
-
-        marker.current = new mapboxgl.Marker({ 
-          element: markerEl, 
-          draggable: true 
-        })
-          .setLngLat(center)
-          .addTo(map.current);
+        markerRef.current = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: center,
+          gmpDraggable: true,
+          content: markerContent,
+        });
 
         // Handle marker drag end
-        marker.current.on('dragend', async () => {
-          const lngLat = marker.current.getLngLat();
-          await reverseGeocode(lngLat.lat, lngLat.lng);
+        markerRef.current.addListener('dragend', async () => {
+          const position = markerRef.current?.position;
+          if (position) {
+            const lat = typeof position.lat === 'function' ? position.lat() : position.lat;
+            const lng = typeof position.lng === 'function' ? position.lng() : position.lng;
+            await reverseGeocode(lat, lng);
+          }
         });
 
         // Handle map click
-        map.current.on('click', async (e: any) => {
-          const { lng, lat } = e.lngLat;
-          marker.current.setLngLat([lng, lat]);
-          await reverseGeocode(lat, lng);
+        mapRef.current.addListener('click', async (e: google.maps.MapMouseEvent) => {
+          if (e.latLng && markerRef.current) {
+            markerRef.current.position = e.latLng;
+            await reverseGeocode(e.latLng.lat(), e.latLng.lng());
+          }
         });
 
         // Add pharmacy marker if provided
         if (pharmacyLocation) {
-          const pharmacyEl = document.createElement('div');
-          pharmacyEl.innerHTML = '🏥';
-          pharmacyEl.style.fontSize = '32px';
-          
-          new mapboxgl.Marker({ element: pharmacyEl })
-            .setLngLat([pharmacyLocation.longitude, pharmacyLocation.latitude])
-            .addTo(map.current);
+          const pharmacyContent = document.createElement('div');
+          pharmacyContent.innerHTML = '🏥';
+          pharmacyContent.style.fontSize = '32px';
+
+          pharmacyMarkerRef.current = new AdvancedMarkerElement({
+            map: mapRef.current,
+            position: { lat: pharmacyLocation.latitude, lng: pharmacyLocation.longitude },
+            content: pharmacyContent,
+          });
         }
 
         setIsLoading(false);
@@ -125,83 +197,70 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     initializeMap();
 
     return () => {
-      if (map.current) {
-        map.current.remove();
+      if (markerRef.current) {
+        markerRef.current.map = null;
+      }
+      if (pharmacyMarkerRef.current) {
+        pharmacyMarkerRef.current.map = null;
       }
     };
-  }, [mapboxToken, initialLocation, pharmacyLocation]);
+  }, [isScriptLoaded, initialLocation, pharmacyLocation]);
 
-  const reverseGeocode = async (lat: number, lng: number) => {
-    if (!mapboxToken) return;
+  // Setup Places Autocomplete
+  useEffect(() => {
+    if (!isScriptLoaded || !inputRef.current || !window.google?.maps?.places) return;
 
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&country=TZ`
-      );
-      const data = await response.json();
+    autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+      componentRestrictions: { country: 'tz' },
+      fields: ['formatted_address', 'geometry', 'name'],
+    });
 
-      if (data.features && data.features.length > 0) {
-        const place = data.features[0];
+    autocompleteRef.current.addListener('place_changed', () => {
+      const place = autocompleteRef.current?.getPlace();
+      if (place?.geometry?.location) {
+        const lat = place.geometry.location.lat();
+        const lng = place.geometry.location.lng();
+
         const location: LocationData = {
           latitude: lat,
           longitude: lng,
-          address: place.place_name,
-          placeName: place.text,
+          address: place.formatted_address || '',
+          placeName: place.name,
+        };
+
+        setSelectedLocation(location);
+        onLocationSelect(location);
+        setSearchQuery(place.name || place.formatted_address || '');
+
+        if (markerRef.current && mapRef.current) {
+          markerRef.current.position = { lat, lng };
+          mapRef.current.panTo({ lat, lng });
+          mapRef.current.setZoom(16);
+        }
+      }
+    });
+  }, [isScriptLoaded, onLocationSelect]);
+
+  const reverseGeocode = async (lat: number, lng: number) => {
+    if (!window.google?.maps) return;
+
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const response = await geocoder.geocode({ location: { lat, lng } });
+
+      if (response.results && response.results.length > 0) {
+        const place = response.results[0];
+        const location: LocationData = {
+          latitude: lat,
+          longitude: lng,
+          address: place.formatted_address,
+          placeName: place.address_components?.[0]?.short_name,
         };
         setSelectedLocation(location);
         onLocationSelect(location);
       }
     } catch (err) {
       console.error('Reverse geocode error:', err);
-    }
-  };
-
-  const searchPlaces = useCallback(async (query: string) => {
-    if (!mapboxToken || query.length < 3) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=TZ&limit=5`
-      );
-      const data = await response.json();
-      setSearchResults(data.features || []);
-    } catch (err) {
-      console.error('Search error:', err);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [mapboxToken]);
-
-  useEffect(() => {
-    const debounce = setTimeout(() => {
-      if (searchQuery) {
-        searchPlaces(searchQuery);
-      }
-    }, 300);
-    return () => clearTimeout(debounce);
-  }, [searchQuery, searchPlaces]);
-
-  const selectSearchResult = (result: any) => {
-    const [lng, lat] = result.center;
-    const location: LocationData = {
-      latitude: lat,
-      longitude: lng,
-      address: result.place_name,
-      placeName: result.text,
-    };
-
-    setSelectedLocation(location);
-    onLocationSelect(location);
-    setSearchQuery('');
-    setSearchResults([]);
-
-    if (marker.current && map.current) {
-      marker.current.setLngLat([lng, lat]);
-      map.current.flyTo({ center: [lng, lat], zoom: 16 });
     }
   };
 
@@ -214,12 +273,13 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        
-        if (marker.current && map.current) {
-          marker.current.setLngLat([longitude, latitude]);
-          map.current.flyTo({ center: [longitude, latitude], zoom: 16 });
+
+        if (markerRef.current && mapRef.current) {
+          markerRef.current.position = { lat: latitude, lng: longitude };
+          mapRef.current.panTo({ lat: latitude, lng: longitude });
+          mapRef.current.setZoom(16);
         }
-        
+
         await reverseGeocode(latitude, longitude);
       },
       (err) => {
@@ -230,8 +290,8 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
     );
   };
 
-  // Fallback UI when map is not available - but still show map container for loading
-  if (error && !mapboxToken) {
+  // Fallback UI when map is not available
+  if (error && !apiKey) {
     return (
       <Card>
         <CardContent className="p-4 space-y-4">
@@ -245,8 +305,8 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
             onChange={(e) => {
               setSearchQuery(e.target.value);
               const location: LocationData = {
-                latitude: defaultCenter[1],
-                longitude: defaultCenter[0],
+                latitude: defaultCenter.lat,
+                longitude: defaultCenter.lng,
                 address: e.target.value,
               };
               onLocationSelect(location);
@@ -265,54 +325,33 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={inputRef}
               placeholder={placeholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Button 
-            type="button" 
-            variant="outline" 
+          <Button
+            type="button"
+            variant="outline"
             onClick={useCurrentLocation}
             title="Use current location"
           >
             <Locate className="h-4 w-4" />
           </Button>
         </div>
-
-        {/* Search Results Dropdown */}
-        {searchResults.length > 0 && (
-          <Card className="absolute z-50 w-full mt-1 max-h-60 overflow-auto">
-            <CardContent className="p-0">
-              {searchResults.map((result, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  className="w-full p-3 text-left hover:bg-muted border-b last:border-b-0 flex items-start gap-2"
-                  onClick={() => selectSearchResult(result)}
-                >
-                  <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                  <div>
-                    <p className="font-medium text-sm">{result.text}</p>
-                    <p className="text-xs text-muted-foreground">{result.place_name}</p>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* Map Container */}
       <div className="relative">
         {isLoading && (
           <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-lg">
-            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         )}
         <div ref={mapContainer} className="h-64 w-full rounded-lg border" />
-        
+
         {/* Selected Location Badge */}
         {selectedLocation && (
           <div className="absolute bottom-2 left-2 right-2 bg-background/95 backdrop-blur p-2 rounded-lg border shadow-sm">

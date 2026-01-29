@@ -1,9 +1,18 @@
+/// <reference types="@types/google.maps" />
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, RefreshCw, AlertCircle, Locate, Phone, User } from 'lucide-react';
+import { MapPin, Navigation, RefreshCw, AlertCircle, Locate, Phone, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+
+// Extend Window interface for Google Maps
+declare global {
+  interface Window {
+    google: typeof google;
+    initGoogleMapsTracking: () => void;
+  }
+}
 
 interface DeliveryTrackingMapProps {
   orderId: string;
@@ -23,6 +32,34 @@ interface RiderLocation {
   timestamp: string;
 }
 
+// Load Google Maps script dynamically
+const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (window.google?.maps) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve());
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMapsTracking`;
+    script.async = true;
+    script.defer = true;
+
+    (window as any).initGoogleMapsTracking = () => {
+      resolve();
+    };
+
+    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+    document.head.appendChild(script);
+  });
+};
+
 const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
   orderId,
   riderId,
@@ -35,108 +72,132 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
   customerPhone
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<any>(null);
-  const riderMarker = useRef<any>(null);
-  const deliveryMarker = useRef<any>(null);
-  const pickupMarker = useRef<any>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const riderMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const deliveryMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const pickupMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  
   const [riderLocation, setRiderLocation] = useState<RiderLocation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const watchId = useRef<number | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
-  // Fetch Mapbox token
+  // Default to Dodoma, Tanzania
+  const defaultCenter = { lat: -6.1630, lng: 35.7516 };
+
+  // Fetch API key from edge function
   useEffect(() => {
-    const token = import.meta.env.VITE_MAPBOX_TOKEN || null;
-    setMapboxToken(token);
-    if (!token) {
-      setError('Map configuration pending. Contact support if this persists.');
-      setIsLoading(false);
-    }
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch(
+          `https://frgblvloxhcnwrgvjazk.supabase.co/functions/v1/google-maps-config`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (!response.ok) throw new Error('Failed to fetch API key');
+        const data = await response.json();
+        setApiKey(data.apiKey);
+      } catch (err) {
+        console.error('Error fetching Google Maps API key:', err);
+        setError('Map configuration pending');
+        setIsLoading(false);
+      }
+    };
+
+    fetchApiKey();
   }, []);
 
-  // Initialize map when token is available
   useEffect(() => {
-    if (!mapboxToken || !mapContainer.current) return;
+    if (!apiKey) return;
+
+    loadGoogleMapsScript(apiKey)
+      .then(() => {
+        setIsScriptLoaded(true);
+      })
+      .catch((err) => {
+        console.error('Error loading Google Maps:', err);
+        setError('Failed to load maps');
+        setIsLoading(false);
+      });
+  }, [apiKey]);
+
+  // Initialize map when script is loaded
+  useEffect(() => {
+    if (!isScriptLoaded || !mapContainer.current || !window.google) return;
 
     const initializeMap = async () => {
       try {
-        const mapboxgl = (await import('mapbox-gl')).default;
-        await import('mapbox-gl/dist/mapbox-gl.css');
-        
-        mapboxgl.accessToken = mapboxToken;
-        
-        // Default to Dodoma, Tanzania or use provided coordinates
-        let defaultCenter: [number, number] = [35.7516, -6.1630];
-        
+        let center = defaultCenter;
+
         if (deliveryCoordinates) {
-          defaultCenter = [deliveryCoordinates.longitude, deliveryCoordinates.latitude];
+          center = { lat: deliveryCoordinates.latitude, lng: deliveryCoordinates.longitude };
         } else if (pickupCoordinates) {
-          defaultCenter = [pickupCoordinates.longitude, pickupCoordinates.latitude];
+          center = { lat: pickupCoordinates.latitude, lng: pickupCoordinates.longitude };
         }
-        
-        map.current = new mapboxgl.Map({
-          container: mapContainer.current!,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: defaultCenter,
+
+        mapRef.current = new google.maps.Map(mapContainer.current!, {
+          center,
           zoom: 14,
+          mapId: 'bepawa-tracking-map',
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
         });
 
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
 
         // Add rider marker
-        const riderEl = document.createElement('div');
-        riderEl.className = 'rider-marker';
-        riderEl.innerHTML = '🏍️';
-        riderEl.style.fontSize = '32px';
-        riderEl.style.cursor = 'pointer';
-        
-        riderMarker.current = new mapboxgl.Marker({ element: riderEl })
-          .setLngLat(defaultCenter)
-          .addTo(map.current);
+        const riderContent = document.createElement('div');
+        riderContent.innerHTML = '🏍️';
+        riderContent.style.fontSize = '32px';
+        riderContent.style.cursor = 'pointer';
+
+        riderMarkerRef.current = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: center,
+          content: riderContent,
+        });
 
         // Add pickup marker (pharmacy)
         if (pickupCoordinates) {
-          const pickupEl = document.createElement('div');
-          pickupEl.innerHTML = '🏥';
-          pickupEl.style.fontSize = '32px';
-          
-          pickupMarker.current = new mapboxgl.Marker({ element: pickupEl })
-            .setLngLat([pickupCoordinates.longitude, pickupCoordinates.latitude])
-            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Pharmacy</strong><br/>${pickupAddress || 'Pickup location'}`))
-            .addTo(map.current);
+          const pickupContent = document.createElement('div');
+          pickupContent.innerHTML = '🏥';
+          pickupContent.style.fontSize = '32px';
+
+          pickupMarkerRef.current = new AdvancedMarkerElement({
+            map: mapRef.current,
+            position: { lat: pickupCoordinates.latitude, lng: pickupCoordinates.longitude },
+            content: pickupContent,
+          });
         }
 
         // Add delivery destination marker
         if (deliveryCoordinates) {
-          const destEl = document.createElement('div');
-          destEl.innerHTML = '📍';
-          destEl.style.fontSize = '32px';
-          
-          deliveryMarker.current = new mapboxgl.Marker({ element: destEl })
-            .setLngLat([deliveryCoordinates.longitude, deliveryCoordinates.latitude])
-            .setPopup(new mapboxgl.Popup().setHTML(`<strong>${customerName || 'Customer'}</strong><br/>${deliveryAddress || 'Delivery location'}`))
-            .addTo(map.current);
-        } else if (deliveryAddress) {
-          // Fallback: place marker at offset if no coordinates
-          const destEl = document.createElement('div');
-          destEl.innerHTML = '📍';
-          destEl.style.fontSize = '32px';
-          
-          new mapboxgl.Marker({ element: destEl })
-            .setLngLat([defaultCenter[0] + 0.01, defaultCenter[1] + 0.01])
-            .setPopup(new mapboxgl.Popup().setHTML(`<strong>Delivery</strong><br/>${deliveryAddress}`))
-            .addTo(map.current);
+          const destContent = document.createElement('div');
+          destContent.innerHTML = '📍';
+          destContent.style.fontSize = '32px';
+
+          deliveryMarkerRef.current = new AdvancedMarkerElement({
+            map: mapRef.current,
+            position: { lat: deliveryCoordinates.latitude, lng: deliveryCoordinates.longitude },
+            content: destContent,
+          });
         }
 
         // Fit bounds if we have both pickup and delivery
         if (pickupCoordinates && deliveryCoordinates) {
-          const bounds = new mapboxgl.LngLatBounds()
-            .extend([pickupCoordinates.longitude, pickupCoordinates.latitude])
-            .extend([deliveryCoordinates.longitude, deliveryCoordinates.latitude]);
-          
-          map.current.fitBounds(bounds, { padding: 60 });
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend({ lat: pickupCoordinates.latitude, lng: pickupCoordinates.longitude });
+          bounds.extend({ lat: deliveryCoordinates.latitude, lng: deliveryCoordinates.longitude });
+          mapRef.current.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
         }
 
         setIsLoading(false);
@@ -150,11 +211,11 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     initializeMap();
 
     return () => {
-      if (map.current) {
-        map.current.remove();
-      }
+      if (riderMarkerRef.current) riderMarkerRef.current.map = null;
+      if (deliveryMarkerRef.current) deliveryMarkerRef.current.map = null;
+      if (pickupMarkerRef.current) pickupMarkerRef.current.map = null;
     };
-  }, [mapboxToken, deliveryAddress, deliveryCoordinates, pickupAddress, pickupCoordinates, customerName]);
+  }, [isScriptLoaded, deliveryCoordinates, pickupCoordinates]);
 
   // Subscribe to rider location updates
   useEffect(() => {
@@ -165,15 +226,11 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
       .on('broadcast', { event: 'location_update' }, (payload) => {
         const location = payload.payload as RiderLocation;
         setRiderLocation(location);
-        
+
         // Update marker position
-        if (riderMarker.current && map.current) {
-          riderMarker.current.setLngLat([location.longitude, location.latitude]);
-          map.current.flyTo({
-            center: [location.longitude, location.latitude],
-            zoom: 15,
-            duration: 1000
-          });
+        if (riderMarkerRef.current && mapRef.current) {
+          riderMarkerRef.current.position = { lat: location.latitude, lng: location.longitude };
+          mapRef.current.panTo({ lat: location.latitude, lng: location.longitude });
         }
       })
       .subscribe();
@@ -191,7 +248,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
     }
 
     setIsTracking(true);
-    
+
     watchId.current = navigator.geolocation.watchPosition(
       async (position) => {
         const location: RiderLocation = {
@@ -199,7 +256,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
           longitude: position.coords.longitude,
           timestamp: new Date().toISOString()
         };
-        
+
         setRiderLocation(location);
 
         // Broadcast location to subscribers
@@ -210,13 +267,9 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
         });
 
         // Update marker
-        if (riderMarker.current && map.current) {
-          riderMarker.current.setLngLat([location.longitude, location.latitude]);
-          map.current.flyTo({
-            center: [location.longitude, location.latitude],
-            zoom: 15,
-            duration: 500
-          });
+        if (riderMarkerRef.current && mapRef.current) {
+          riderMarkerRef.current.position = { lat: location.latitude, lng: location.longitude };
+          mapRef.current.panTo({ lat: location.latitude, lng: location.longitude });
         }
       },
       (err) => {
@@ -246,7 +299,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
   };
 
   // Fallback UI when map is not available
-  if (error || !mapboxToken) {
+  if (error || !apiKey) {
     return (
       <Card className="overflow-hidden">
         <CardContent className="p-4 space-y-4">
@@ -254,7 +307,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
             <AlertCircle className="h-5 w-5" />
             <span>Live map unavailable</span>
           </div>
-          
+
           {/* Fallback tracking info */}
           <div className="space-y-3">
             {pickupAddress && (
@@ -267,8 +320,8 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                     </p>
                     <p className="text-sm text-muted-foreground">{pickupAddress}</p>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => openInMaps(pickupAddress)}
                   >
@@ -277,7 +330,7 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                 </div>
               </div>
             )}
-            
+
             {deliveryAddress && (
               <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg">
                 <div className="flex items-center justify-between">
@@ -298,8 +351,8 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
                       </p>
                     )}
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => openInMaps(deliveryAddress)}
                   >
@@ -350,12 +403,12 @@ const DeliveryTrackingMap: React.FC<DeliveryTrackingMapProps> = ({
       <CardContent className="p-0 relative">
         {isLoading && (
           <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
-            <RefreshCw className="h-6 w-6 animate-spin" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         )}
-        
+
         <div ref={mapContainer} className="h-64 w-full" />
-        
+
         {/* Location info overlay */}
         <div className="absolute bottom-2 left-2 right-2 bg-background/90 backdrop-blur p-2 rounded-lg text-xs space-y-1">
           {riderLocation && (
