@@ -841,6 +841,7 @@ const getTreatmentGuidelineResponse = (query: string): Message | null => {
   };
 
   // Main bot response function using care orchestrator
+  // For pharmacy/wholesale users: Only uses RAG/STG database (no general LLM)
   const getBotResponse = async (message: string): Promise<Omit<Message, 'id' | 'timestamp'>> => {
     try {
       // Detect language and route through care orchestrator
@@ -849,7 +850,8 @@ const getTreatmentGuidelineResponse = (query: string): Message | null => {
         text: message, 
         lang,
         sessionId: user?.id || 'anonymous',
-        userId: user?.id
+        userId: user?.id,
+        userRole: user?.role // Pass user role to orchestrator for RAG-only routing
       };
       
       const response = await route(input);
@@ -859,7 +861,8 @@ const getTreatmentGuidelineResponse = (query: string): Message | null => {
         content: response.content,
         suggestions: response.suggestions,
         category: response.category === 'safety' ? 'medical' : 
-                 response.category === 'education' ? 'medical' : 'general'
+                 response.category === 'education' ? 'medical' : 
+                 response.category === 'medical' ? 'medical' : 'general'
       };
     } catch (error) {
       console.error('Error getting bot response:', error);
