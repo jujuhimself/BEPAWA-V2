@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   Package, 
@@ -11,13 +11,15 @@ import {
   BoxesIcon,
   Scan,
   AlertTriangle,
-  Clock
+  Clock,
+  Truck
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   DashboardLayout,
@@ -35,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import InventoryForecasting from '@/components/inventory/InventoryForecasting';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { InvoiceGenerator } from "@/components/invoice/InvoiceGenerator";
+import WholesaleCODOrders from "@/components/wholesale/WholesaleCODOrders";
 
 type WholesaleOrder = {
   id: string;
@@ -399,11 +402,22 @@ const WholesaleDashboard = () => {
 
       {/* Invoice Generator */}
       <DashboardSection
-        title="Invoice Generator"
-        description="Create and manage invoices"
-        icon={<FileText className="h-4 w-4" />}
+        title="Operations"
+        description="Manage deliveries and invoicing"
+        icon={<Truck className="h-4 w-4" />}
       >
-        <InvoiceGenerator />
+        <Tabs defaultValue="cod-orders" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="cod-orders">COD Orders</TabsTrigger>
+            <TabsTrigger value="invoices">Invoice Generator</TabsTrigger>
+          </TabsList>
+          <TabsContent value="cod-orders" className="mt-4">
+            <WholesaleCODOrders />
+          </TabsContent>
+          <TabsContent value="invoices" className="mt-4">
+            <InvoiceGenerator />
+          </TabsContent>
+        </Tabs>
       </DashboardSection>
     </DashboardLayout>
   );

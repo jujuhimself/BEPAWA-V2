@@ -791,6 +791,376 @@ class DeliveryService {
   }
 
   // ==========================================
+  // WHOLESALE COD ORDER MANAGEMENT
+  // ==========================================
+
+  async getWholesaleCODOrders(wholesalerId: string): Promise<any[]> {
+    // Fetch orders where wholesaler is the seller
+    const { data: ordersData, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('wholesaler_id', wholesalerId)
+      .eq('payment_method', 'cod')
+      .in('status', [
+        COD_ORDER_STATUSES.PENDING_PHARMACY_CONFIRMATION,
+        COD_ORDER_STATUSES.PREPARING_ORDER,
+        COD_ORDER_STATUSES.AWAITING_RIDER,
+        COD_ORDER_STATUSES.RIDER_ASSIGNED,
+        COD_ORDER_STATUSES.OUT_FOR_DELIVERY,
+      ])
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching wholesale COD orders:', error);
+      throw error;
+    }
+
+    if (!ordersData || ordersData.length === 0) return [];
+
+    // Fetch related profiles for retailer and rider data
+    const retailerIds = [...new Set(ordersData.map((o: any) => o.pharmacy_id).filter(Boolean))];
+    const riderIds = [...new Set(ordersData.map((o: any) => o.rider_id).filter(Boolean))];
+    const allProfileIds = [...new Set([...retailerIds, ...riderIds])];
+
+    let profilesMap: Record<string, any> = {};
+    if (allProfileIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, phone, address, pharmacy_name, business_name')
+        .in('id', allProfileIds);
+      
+      profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
+        acc[p.id] = p;
+        return acc;
+      }, {});
+    }
+
+    // Attach retailer and rider data to orders
+    return ordersData.map((order: any) => ({
+      ...order,
+      retailer: profilesMap[order.pharmacy_id] || null,
+      rider: profilesMap[order.rider_id] || null,
+    }));
+  }
+
+  async acceptWholesaleOrder(orderId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get order details
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (orderError || !order) throw new Error('Order not found');
+
+    // Get retailer email separately
+    let retailerEmail = '';
+    if (order.pharmacy_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', order.pharmacy_id)
+        .single();
+      retailerEmail = profile?.email || '';
+    }
+
+    // Reserve stock for the order items
+    const itemsData = order.items;
+    const items = Array.isArray(itemsData) ? itemsData : JSON.parse(String(itemsData) || '[]');
+    await this.reserveStock(orderId, items);
+
+    // Update order status
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status: COD_ORDER_STATUSES.PREPARING_ORDER,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderId);
+
+    if (error) throw error;
+
+    // Log status change
+    await supabase.from('order_status_history').insert({
+      order_id: orderId,
+      status: COD_ORDER_STATUSES.PREPARING_ORDER,
+      changed_by: user.id,
+      notes: 'Order accepted by wholesaler',
+    });
+
+    // Notify retailer
+    if (order.pharmacy_id) {
+      await comprehensiveNotificationService.notifyOrderStatusChange(
+        order.pharmacy_id,
+        retailerEmail,
+        order.order_number,
+        COD_ORDER_STATUSES.PENDING_PHARMACY_CONFIRMATION,
+        COD_ORDER_STATUSES.PREPARING_ORDER
+      );
+    }
+
+    await this.logAudit('wholesale_order_accepted', 'order', orderId, { status: COD_ORDER_STATUSES.PREPARING_ORDER });
+  }
+
+  async rejectWholesaleOrder(orderId: string, reason: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get order details
+    const { data: order } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    // Get retailer email separately
+    let retailerEmail = '';
+    if (order?.pharmacy_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', order.pharmacy_id)
+        .single();
+      retailerEmail = profile?.email || '';
+    }
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status: COD_ORDER_STATUSES.CANCELLED,
+        notes: `Rejected by wholesaler: ${reason}`,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderId);
+
+    if (error) throw error;
+
+    await supabase.from('order_status_history').insert({
+      order_id: orderId,
+      status: COD_ORDER_STATUSES.CANCELLED,
+      changed_by: user.id,
+      notes: `Order rejected: ${reason}`,
+    });
+
+    if (order?.pharmacy_id) {
+      await comprehensiveNotificationService.notifyOrderStatusChange(
+        order.pharmacy_id,
+        retailerEmail,
+        order.order_number,
+        order.status,
+        COD_ORDER_STATUSES.CANCELLED
+      );
+    }
+
+    await this.logAudit('wholesale_order_rejected', 'order', orderId, { reason });
+  }
+
+  async markWholesaleOrderReady(orderId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status: COD_ORDER_STATUSES.AWAITING_RIDER,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderId);
+
+    if (error) throw error;
+
+    await supabase.from('order_status_history').insert({
+      order_id: orderId,
+      status: COD_ORDER_STATUSES.AWAITING_RIDER,
+      changed_by: user.id,
+      notes: 'Order ready for pickup',
+    });
+
+    await this.logAudit('wholesale_order_ready', 'order', orderId, { status: COD_ORDER_STATUSES.AWAITING_RIDER });
+  }
+
+  async requestWholesaleRider(orderId: string, riderId: string): Promise<DeliveryAssignment> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get order details
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (orderError || !order) throw new Error('Order not found');
+
+    // Get wholesaler details
+    const { data: wholesaler } = await supabase
+      .from('profiles')
+      .select('address, business_name')
+      .eq('id', user.id)
+      .single();
+
+    // Get retailer details for delivery address
+    const { data: retailer } = await supabase
+      .from('profiles')
+      .select('address, name, phone, pharmacy_name')
+      .eq('id', order.pharmacy_id)
+      .single();
+
+    // Create delivery assignment
+    const { data: assignment, error } = await supabase
+      .from('delivery_assignments')
+      .insert({
+        order_id: orderId,
+        rider_id: riderId,
+        pharmacy_id: user.id, // Using pharmacy_id field for the business owner (wholesaler)
+        status: 'assigned',
+        pickup_address: wholesaler?.address || '',
+        delivery_address: order.delivery_address || retailer?.address || '',
+        customer_phone: order.delivery_phone || retailer?.phone || '',
+        customer_name: retailer?.pharmacy_name || retailer?.name || 'Retailer',
+        cash_amount: order.total_amount,
+        cash_collected: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Update order with rider info
+    await supabase
+      .from('orders')
+      .update({ 
+        rider_id: riderId,
+        status: COD_ORDER_STATUSES.RIDER_ASSIGNED,
+        rider_assigned_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderId);
+
+    await supabase.from('order_status_history').insert({
+      order_id: orderId,
+      status: COD_ORDER_STATUSES.RIDER_ASSIGNED,
+      changed_by: user.id,
+      notes: `Rider assigned for wholesale delivery`,
+    });
+
+    // Notify rider
+    const { data: rider } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', riderId)
+      .single();
+
+    if (rider) {
+      await comprehensiveNotificationService.notifyOrderStatusChange(
+        riderId,
+        rider.email || '',
+        order.order_number,
+        'New wholesale delivery assignment',
+        'assigned'
+      );
+    }
+
+    await this.logAudit('wholesale_rider_assigned', 'delivery_assignment', assignment.id, { 
+      order_id: orderId, 
+      rider_id: riderId 
+    });
+
+    return assignment as DeliveryAssignment;
+  }
+
+  async createWholesaleCODOrder(orderData: {
+    retailer_id: string;
+    wholesaler_id: string;
+    items: any[];
+    total_amount: number;
+    delivery_address: string;
+    delivery_phone: string;
+    delivery_notes?: string;
+    delivery_fee?: number;
+    delivery_coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  }): Promise<any> {
+    const orderNumber = this.generateOrderNumber();
+    
+    // Create the order with COD payment method
+    const { data: order, error } = await supabase
+      .from('orders')
+      .insert({
+        user_id: orderData.retailer_id, // The buyer
+        pharmacy_id: orderData.retailer_id, // The retailer buying
+        wholesaler_id: orderData.wholesaler_id, // The seller
+        order_number: orderNumber,
+        items: orderData.items,
+        total_amount: orderData.total_amount,
+        status: COD_ORDER_STATUSES.PENDING_PHARMACY_CONFIRMATION,
+        payment_status: 'pending',
+        payment_method: 'cod',
+        order_type: 'wholesale',
+        delivery_address: orderData.delivery_address,
+        delivery_phone: orderData.delivery_phone,
+        delivery_notes: orderData.delivery_notes,
+        delivery_fee: orderData.delivery_fee || 0,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating wholesale COD order:', error);
+      throw error;
+    }
+
+    // Notify the wholesaler about the new order
+    const { data: wholesaler } = await supabase
+      .from('profiles')
+      .select('email, business_name')
+      .eq('id', orderData.wholesaler_id)
+      .single();
+
+    // Get retailer info for notifications
+    const { data: retailer } = await supabase
+      .from('profiles')
+      .select('email, name, pharmacy_name')
+      .eq('id', orderData.retailer_id)
+      .single();
+
+    if (wholesaler) {
+      await comprehensiveNotificationService.notifyPharmacyCODOrder(
+        orderData.wholesaler_id,
+        wholesaler.email || '',
+        orderNumber,
+        retailer?.pharmacy_name || retailer?.name || 'Retailer',
+        orderData.total_amount
+      );
+    }
+
+    // Notify retailer their order was placed
+    if (retailer) {
+      await comprehensiveNotificationService.notifyCODOrderPlaced(
+        orderData.retailer_id,
+        retailer.email || '',
+        orderNumber,
+        orderData.total_amount,
+        wholesaler?.business_name || 'Wholesaler'
+      );
+    }
+
+    // Log audit
+    await this.logAudit('wholesale_order_created', 'order', order.id, {
+      order_number: orderNumber,
+      payment_method: 'cod',
+      status: COD_ORDER_STATUSES.PENDING_PHARMACY_CONFIRMATION,
+    });
+
+    return order;
+  }
+
+  // ==========================================
   // UTILITIES
   // ==========================================
 
