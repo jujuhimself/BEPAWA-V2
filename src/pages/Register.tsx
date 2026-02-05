@@ -18,7 +18,7 @@ interface FormData {
   password: string;
   phone: string;
   address: string;
-  role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery' | '';
+  role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery' | 'staff' | '';
   
   // Individual fields
   dateOfBirth: string;
@@ -43,6 +43,9 @@ interface FormData {
   // Delivery fields
   vehicleType: string;
   vehicleRegistration: string;
+
+  // Staff fields
+  invitationEmail: string;
 }
 
 const Register = () => {
@@ -68,6 +71,7 @@ const Register = () => {
     operatingHours: "",
     vehicleType: "",
     vehicleRegistration: "",
+    invitationEmail: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -82,7 +86,7 @@ const Register = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRoleSelect = (role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery') => {
+  const handleRoleSelect = (role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery' | 'staff') => {
     setFormData(prev => ({ ...prev, role }));
   };
 
@@ -113,6 +117,9 @@ const Register = () => {
       return formData.labName && formData.labLicense && formData.specializations && formData.operatingHours;
     } else if (formData.role === 'delivery') {
       return formData.vehicleType && formData.vehicleRegistration;
+    } else if (formData.role === 'staff') {
+      // Staff just needs to confirm their invitation email matches
+      return true; // Staff validation is simpler - invitation linking happens on login
     }
     return false;
   };
@@ -176,6 +183,10 @@ const Register = () => {
     } else if (formData.role === 'delivery') {
       (userData as any).vehicleType = formData.vehicleType;
       (userData as any).vehicleRegistration = formData.vehicleRegistration;
+    } else if (formData.role === 'staff') {
+      // Staff members register as individual role initially
+      // The system will link them to their employer via email matching
+      userData.role = 'individual' as any; // Staff are stored as individual but linked via staff_members table
     }
 
     const result = await register(userData);
@@ -327,6 +338,7 @@ const Register = () => {
                 {formData.role === 'wholesale' && 'Business Information'}
                 {formData.role === 'lab' && 'Lab Information'}
                 {formData.role === 'delivery' && 'Rider Information'}
+                {formData.role === 'staff' && 'Staff Information'}
               </h3>
               <p className="text-gray-600">Provide additional details for your account</p>
             </div>
@@ -503,6 +515,28 @@ const Register = () => {
                 </div>
               </div>
             )}
+
+            {formData.role === 'staff' && (
+              <div className="space-y-4">
+                <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
+                  <h4 className="font-semibold text-foreground mb-2">📧 Staff Registration</h4>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    If you received an invitation email from a pharmacy or wholesaler, register using the <strong>same email address</strong> from the invitation.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    After registration, you'll automatically be linked to your employer's account and gain access based on the permissions they assigned you.
+                  </p>
+                </div>
+                <div className="bg-accent/50 p-4 rounded-lg border border-accent">
+                  <h4 className="font-semibold text-foreground mb-2">⚠️ Important</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Make sure you're using the email from your invitation</li>
+                    <li>• Your employer will be notified when you complete registration</li>
+                    <li>• You'll see your assigned features after login</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -536,6 +570,11 @@ const Register = () => {
                       <div><span className="font-medium">Vehicle Type:</span> {formData.vehicleType}</div>
                       <div><span className="font-medium">Registration:</span> {formData.vehicleRegistration}</div>
                     </>
+                  )}
+                  {formData.role === 'staff' && (
+                    <div className="text-primary">
+                      <span className="font-medium">Note:</span> Your account will be linked to your employer after registration
+                    </div>
                   )}
                 </div>
               </CardContent>

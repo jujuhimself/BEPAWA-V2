@@ -163,12 +163,24 @@ const StaffInviteDialog = ({ open, onOpenChange, branches = [], onSuccess }: Sta
                       .map(([perm]) => `<li>${perm.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</li>`)
                       .join('')}
                   </ul>
+                  <div style="background-color: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                    <h3 style="color: #0369a1; margin: 0 0 10px 0; font-size: 16px;">📋 How to Get Started:</h3>
+                    <ol style="color: #0c4a6e; font-size: 14px; margin: 0; padding-left: 20px;">
+                      <li style="margin-bottom: 8px;">Click the "Register as Staff" button below</li>
+                      <li style="margin-bottom: 8px;">Select <strong>"Staff Member"</strong> as your account type</li>
+                      <li style="margin-bottom: 8px;">Use this email address: <strong>${formData.email}</strong></li>
+                      <li>Complete the registration - you'll be automatically linked to ${businessName}</li>
+                    </ol>
+                  </div>
                   <div style="margin: 30px 0;">
-                    <a href="https://bepawaa.com/login" 
+                    <a href="https://bepawaa.com/register" 
                        style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
-                      Get Started
+                      Register as Staff
                     </a>
                   </div>
+                  <p style="color: #6b7280; font-size: 14px;">
+                    Already have an account? <a href="https://bepawaa.com/login" style="color: #667eea;">Log in here</a> - you'll be automatically linked if you use the same email.
+                  </p>
                   <p style="color: #9ca3af; font-size: 14px; margin-top: 30px;">
                     If you didn't expect this invitation, you can ignore this email.
                   </p>

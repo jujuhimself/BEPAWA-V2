@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { User, Store, Building2, Microscope, Bike } from 'lucide-react';
+import { User, Store, Building2, Microscope, Bike, Users } from 'lucide-react';
 
 interface RoleSelectorProps {
   selectedRole: string;
-  onRoleSelect: (role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery') => void;
+  onRoleSelect: (role: 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery' | 'staff') => void;
 }
 
 const RoleSelector = ({ selectedRole, onRoleSelect }: RoleSelectorProps) => {
@@ -48,6 +48,14 @@ const RoleSelector = ({ selectedRole, onRoleSelect }: RoleSelectorProps) => {
       icon: Bike,
       features: ['Accept delivery assignments', 'Real-time order tracking', 'Cash collection & remittance', 'Route navigation support'],
       color: 'bg-yellow-500'
+    },
+    {
+      id: 'staff',
+      title: 'Staff Member',
+      description: 'Join your pharmacy or wholesaler team with an invitation from your employer',
+      icon: Users,
+      features: ['Join via email invitation', 'Access based on assigned permissions', 'Work with your team\'s inventory', 'Limited dashboard access'],
+      color: 'bg-cyan-500'
     }
   ];
 
