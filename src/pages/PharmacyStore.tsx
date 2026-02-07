@@ -46,7 +46,8 @@ const PharmacyStore = () => {
           .or(`pharmacy_id.eq.${pharmacyId},user_id.eq.${pharmacyId}`)
           .gt('stock', 0)
           .not('status', 'eq', 'deleted')
-          .or('is_retail_product.eq.true,is_public_product.eq.true')
+          .eq('is_retail_product', true)
+          .neq('is_wholesale_product', true)
           .order('name');
         setProducts(productsData || []);
       } catch (error) {

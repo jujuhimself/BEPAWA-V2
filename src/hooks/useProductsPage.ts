@@ -70,12 +70,13 @@ export const useProductsPage = () => {
         
         let data, error;
         if (user.role === 'individual') {
-          // Individuals see only public retail products
+          // Individuals see only retail products, never wholesale
           ({ data, error } = await supabase
             .from('products')
             .select('*')
             .eq('is_public_product', true)
             .eq('is_retail_product', true)
+            .neq('is_wholesale_product', true)
             .order('name')
           );
         } else if (user.role === 'retail') {

@@ -47,8 +47,10 @@ const PublicCatalog = () => {
       let productsData, error;
       
       if (!user || user.role === 'individual') {
-        // Individuals: show any product flagged public OR retail
-        ({ data: productsData, error } = await productsQuery.or('is_public_product.eq.true,is_retail_product.eq.true'));
+        // Individuals: show only retail products, never wholesale
+        ({ data: productsData, error } = await productsQuery
+          .eq('is_retail_product', true)
+          .neq('is_wholesale_product', true));
       } else if (user.role === 'retail') {
         // Retailers: only show public products
         ({ data: productsData, error } = await productsQuery.eq('is_public_product', true));
