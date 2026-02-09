@@ -533,7 +533,7 @@ const dosageCalculator = (msg: string): Message | null => {
     category: 'medical'
   };
 };
-const listAvailableGuidelines = () => treatmentGuidelines.map(g => `• ${g.condition}`).join('\n');
+const listAvailableGuidelinesText = () => treatmentGuidelines.map(g => `• ${g.condition}`).join('\n');
 
 const getDosageCalculatorResponse = (): Message => ({
   id: Date.now().toString(),
@@ -563,43 +563,51 @@ const getTreatmentGuidelineResponse = (query: string): Message | null => {
   }
 
   // list guidelines
-  if (lower.includes('more guidelines') || lower.includes('all guidelines') || lower === 'treatment guidelines') {
+  if (lower.includes('more guidelines') || lower.includes('all guidelines') || lower.includes('list') || lower === 'treatment guidelines') {
     return {
       id: Date.now().toString(),
       type: 'bot',
-      content: `📚 **Available Standard Treatment Guidelines**\n\n${listAvailableGuidelines()}\n\nAsk me about any condition.`,
+      content: `📚 **Available Standard Treatment Guidelines**\n\n${listAvailableGuidelinesText()}\n\nAsk me about any condition or medication name.`,
       timestamp: new Date(),
       category: 'medical',
-      suggestions: ['Malaria', 'Shock', 'Cardiac arrest']
+      suggestions: ['Malaria', 'Hypertension', 'Measles', 'Amoxicillin']
     };
   }
 
+  // Always try to match first – the improved findGuidelines now searches medications too
   const matches = findGuidelines(query);
-  // If no guideline context and no keywords, return null to let other handlers work
-  if (!matches.length && !lower.includes('guideline') && !lower.includes('treatment') && !lower.includes('protocol') && !lower.includes('dosage') && !lower.includes('calculate')) {
-    return null;
-  }
-  // Handle generic keyword queries first
-  if (lower.includes('dosage')) return getDosageCalculatorResponse();
-  if (lower.includes('interaction')) return getDrugInteractionResponse();
-  if (lower.includes('more') || lower === 'treatment guidelines' || lower.includes('guidelines')) {
-    return {
-      id: Date.now().toString(),
-      type: 'bot',
-      content: `📚 **Available Treatment Guidelines**\n\n${listAvailableGuidelines()}\n\nAsk me about any of these conditions (e.g., "Treatment for malaria").`,
-      timestamp: new Date(),
-      suggestions: ['Malaria treatment', 'Cardiac arrest protocol', 'Shock management'],
-      category: 'medical'
-    };
-  }
+  
+  if (matches.length > 0) {
+    // Found matches – format and return them
+  } else {
+    // No matches found – check if user intended a medical query or something else
+    const medicalIntent = lower.includes('guideline') || lower.includes('treatment') || lower.includes('protocol') || lower.includes('dosage') || lower.includes('calculate') || lower.includes('drug') || lower.includes('medication') || lower.includes('dose');
+    
+    if (!medicalIntent) {
+      // Could be a non-medical query; return null to let other handlers try
+      return null;
+    }
+    
+    // Handle generic keyword queries
+    if (lower.includes('dosage') || lower.includes('dose')) return getDosageCalculatorResponse();
+    if (lower.includes('interaction')) return getDrugInteractionResponse();
+    if (lower.includes('guidelines') || lower.includes('more')) {
+      return {
+        id: Date.now().toString(),
+        type: 'bot',
+        content: `📚 **Available Treatment Guidelines**\n\n${listAvailableGuidelinesText()}\n\nAsk me about any of these conditions or medications (e.g., "measles", "amoxicillin").`,
+        timestamp: new Date(),
+        suggestions: ['Malaria', 'Hypertension', 'Measles', 'UTI'],
+        category: 'medical'
+      };
+    }
 
-  if (!matches.length) {
     return {
       id: Date.now().toString(),
       type: 'bot',
-      content: `❌ I couldn't find a standard treatment guideline matching "${query}". Try a different condition or symptom keyword.`,
+      content: `❌ I couldn't find a standard treatment guideline matching "${query}".\n\nTry searching by condition (e.g., "measles", "hypertension") or medication name (e.g., "amoxicillin", "metformin").\n\nType **"list all guidelines"** to see everything available.`,
       timestamp: new Date(),
-      suggestions: ['List available guidelines', 'Malaria treatment', 'Cardiac arrest protocol'],
+      suggestions: ['List all guidelines', 'Measles', 'Hypertension', 'UTI'],
       category: 'medical'
     };
   }

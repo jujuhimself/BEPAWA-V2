@@ -105,23 +105,62 @@ export const treatmentGuidelines: TreatmentGuideline[] = [
   }
   */
 
-// Helper function to find guidelines by condition or symptoms
+// Helper function to find guidelines by condition, symptoms, or medications
 export function findGuidelines(query: string): TreatmentGuideline[] {
-  const searchTerm = query.toLowerCase();
+  const searchTerm = query.toLowerCase().trim();
 
-  // Tokenize query, remove common filler words
+  // Tokenize query, remove very common filler words
+  const fillerWords = new Set(['for', 'the', 'and', 'with', 'treat', 'treatment', 'manage', 'guideline', 'therapy', 'what', 'how', 'dose', 'dosage', 'protocol', 'first', 'line', 'second', 'drug', 'medication', 'medicine', 'show', 'give', 'can', 'you', 'help', 'please']);
   const tokens = searchTerm
     .split(/[^a-z0-9]+/)
-    .filter(t => t.length > 2 && !['for', 'the', 'and', 'with', 'treat', 'treatment', 'manage', 'guideline', 'therapy'].includes(t));
+    .filter(t => t.length > 2 && !fillerWords.has(t));
 
-  return treatmentGuidelines.filter(guideline => {
-    const cond = guideline.condition.toLowerCase();
-    const sym = guideline.symptoms.map(s => s.toLowerCase()).join(' ');
+  // Build a searchable text blob for each guideline (condition + symptoms + all medications)
+  const buildSearchText = (g: TreatmentGuideline): string => {
+    const parts: string[] = [
+      g.condition.toLowerCase(),
+      g.symptoms.map(s => s.toLowerCase()).join(' '),
+    ];
+    // Include medication names from firstLine and secondLine
+    for (const fl of g.firstLine) {
+      parts.push(fl.medication.toLowerCase());
+    }
+    if (g.secondLine) {
+      for (const sl of g.secondLine) {
+        parts.push(sl.medication.toLowerCase());
+      }
+    }
+    // Include counseling and precautions for broader matching
+    parts.push(g.patientCounseling.map(c => c.toLowerCase()).join(' '));
+    return parts.join(' ');
+  };
 
-    // Direct match on full query
-    if (cond.includes(searchTerm) || sym.includes(searchTerm)) return true;
+  // Score each guideline for relevance
+  const scored = treatmentGuidelines.map(g => {
+    const text = buildSearchText(g);
+    let score = 0;
 
-    // Any token matches condition or symptoms
-    return tokens.some(tok => cond.includes(tok) || sym.includes(tok));
+    // Full query exact match in text
+    if (text.includes(searchTerm)) score += 10;
+
+    // Token matches
+    for (const tok of tokens) {
+      if (g.condition.toLowerCase().includes(tok)) score += 5; // condition match is strongest
+      else if (g.symptoms.some(s => s.toLowerCase().includes(tok))) score += 3;
+      else if (text.includes(tok)) score += 2; // medication or other field match
+    }
+
+    return { guideline: g, score };
   });
+
+  // Return all guidelines with score > 0, sorted by relevance
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(s => s.guideline);
+}
+
+// Helper to list all available conditions (for chatbot suggestions)
+export function listAvailableConditions(): string[] {
+  return treatmentGuidelines.map(g => g.condition);
 }
