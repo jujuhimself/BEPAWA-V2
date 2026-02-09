@@ -145,6 +145,50 @@ const BepawaCare = () => {
         </div>
       </section>
 
+      {/* HIV Prevention Services */}
+      <section className="container mx-auto px-4 py-12">
+        <div className="text-center max-w-2xl mx-auto mb-8">
+          <Badge variant="outline" className="mb-3 border-emerald-200 text-emerald-700">HIV Prevention</Badge>
+          <h3 className="text-3xl font-bold text-gray-900">Comprehensive HIV Prevention & Support</h3>
+          <p className="text-gray-600 mt-2">Bepawa provides confidential, stigma-free access to HIV prevention tools — from self-testing to PrEP and PEP services.</p>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="border-0 shadow-md bg-white text-center">
+            <CardContent className="p-6 space-y-3">
+              <Shield className="h-10 w-10 text-emerald-600 mx-auto" />
+              <h4 className="font-bold text-lg">HIV Self-Testing</h4>
+              <p className="text-sm text-gray-600">Order confidential HIV self-test kits delivered to your door. Private, accurate, and easy to use.</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-white text-center">
+            <CardContent className="p-6 space-y-3">
+              <Shield className="h-10 w-10 text-blue-600 mx-auto" />
+              <h4 className="font-bold text-lg">PrEP Access</h4>
+              <p className="text-sm text-gray-600">Pre-Exposure Prophylaxis — daily prevention medicine. Book through nearby health facilities.</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-white text-center">
+            <CardContent className="p-6 space-y-3">
+              <Shield className="h-10 w-10 text-purple-600 mx-auto" />
+              <h4 className="font-bold text-lg">PEP Access</h4>
+              <p className="text-sm text-gray-600">Post-Exposure Prophylaxis — emergency medicine within 72 hours. Time-sensitive, available now.</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-white text-center">
+            <CardContent className="p-6 space-y-3">
+              <Heart className="h-10 w-10 text-green-600 mx-auto" />
+              <h4 className="font-bold text-lg">AI-Guided Consultations</h4>
+              <p className="text-sm text-gray-600">Our AI assistant provides confidential risk assessment, education, and next-step guidance in your language.</p>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="text-center mt-6">
+          <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
+            <Link to="/prep-pep">Browse PrEP & PEP Services</Link>
+          </Button>
+        </div>
+      </section>
+
       <section className="container mx-auto px-4 py-12 bg-white rounded-2xl shadow-sm border border-gray-100">
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div>
@@ -235,6 +279,18 @@ const BepawaCare = () => {
               <AccordionTrigger>How do I book a session?</AccordionTrigger>
               <AccordionContent>
                 You can book directly from this page using the “Book a Counselor Session” button, or through WhatsApp for assistance.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-5">
+              <AccordionTrigger>What are PrEP and PEP?</AccordionTrigger>
+              <AccordionContent>
+                PrEP (Pre-Exposure Prophylaxis) is a daily medicine to prevent HIV infection. PEP (Post-Exposure Prophylaxis) is emergency medicine taken within 72 hours. Both are available through approved facilities on Bepawa.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-6">
+              <AccordionTrigger>Can I order HIV self-test kits?</AccordionTrigger>
+              <AccordionContent>
+                Yes! Order confidential HIV self-test kits with Cash on Delivery. Private, accurate, and delivered to your door.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

@@ -2089,6 +2089,134 @@ export type Database = {
         }
         Relationships: []
       }
+      prep_pep_bookings: {
+        Row: {
+          ai_consultation_done: boolean
+          booking_date: string
+          booking_time: string | null
+          consultation_notes: string | null
+          created_at: string
+          id: string
+          lab_id: string
+          patient_age: number | null
+          patient_gender: string | null
+          patient_name: string
+          patient_phone: string | null
+          payment_method: string
+          payment_status: string
+          service_type: string
+          special_instructions: string | null
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_consultation_done?: boolean
+          booking_date?: string
+          booking_time?: string | null
+          consultation_notes?: string | null
+          created_at?: string
+          id?: string
+          lab_id: string
+          patient_age?: number | null
+          patient_gender?: string | null
+          patient_name: string
+          patient_phone?: string | null
+          payment_method?: string
+          payment_status?: string
+          service_type: string
+          special_instructions?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_consultation_done?: boolean
+          booking_date?: string
+          booking_time?: string | null
+          consultation_notes?: string | null
+          created_at?: string
+          id?: string
+          lab_id?: string
+          patient_age?: number | null
+          patient_gender?: string | null
+          patient_name?: string
+          patient_phone?: string | null
+          payment_method?: string
+          payment_status?: string
+          service_type?: string
+          special_instructions?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prep_pep_bookings_lab_id_fkey"
+            columns: ["lab_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prep_pep_bookings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prep_pep_services: {
+        Row: {
+          consultation_required: boolean
+          created_at: string
+          description: string | null
+          id: string
+          is_available: boolean
+          lab_id: string
+          price: number
+          service_type: string
+          stock_status: string
+          updated_at: string
+        }
+        Insert: {
+          consultation_required?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_available?: boolean
+          lab_id: string
+          price?: number
+          service_type: string
+          stock_status?: string
+          updated_at?: string
+        }
+        Update: {
+          consultation_required?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_available?: boolean
+          lab_id?: string
+          price?: number
+          service_type?: string
+          stock_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prep_pep_services_lab_id_fkey"
+            columns: ["lab_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prescription_items: {
         Row: {
           created_at: string

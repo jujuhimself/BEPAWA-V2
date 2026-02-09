@@ -25,6 +25,7 @@ import MyOrders from "@/pages/MyOrders";
 import Catalog from "@/pages/Catalog";
 import OrderHistory from "@/pages/OrderHistory";
 import PersonalHealth from '@/pages/individual/PersonalHealth';
+import PrepPepServices from '@/pages/individual/PrepPepServices';
 
 // Pharmacy/Retail Pages
 import PharmacyDashboard from "@/pages/PharmacyDashboard";
@@ -185,6 +186,12 @@ const AppRoutes = () => {
       <Route path="/bepawa-care" element={
         <RouteGuard allowedRoles={['individual']}>
           <BepawaCare />
+        </RouteGuard>
+      } />
+      {/* PrEP/PEP Services */}
+      <Route path="/prep-pep" element={
+        <RouteGuard allowedRoles={['individual']}>
+          <PrepPepServices />
         </RouteGuard>
       } />
 
