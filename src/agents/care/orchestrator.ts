@@ -1,7 +1,7 @@
 // Orchestrator for Bepawa Care - now uses therapeutic-chat edge function with LLM
 // For pharmacy/wholesale users: RAG/STG only (no general LLM)
 import { supabase } from '@/integrations/supabase/client';
-import { findGuidelines } from '@/data/treatmentGuidelines';
+import { findGuidelines, listAvailableConditions } from '@/data/treatmentGuidelines';
 
 export type Lang = 'en' | 'sw';
 
@@ -79,15 +79,19 @@ async function getRAGOnlyResponse(input: OrchestratorInput): Promise<Orchestrato
     console.warn('Knowledge search error:', err);
   }
 
-  // Default response when no STG/RAG match found
+  // Default response when no STG/RAG match found – show available conditions
+  const conditions = listAvailableConditions();
+  const conditionList = conditions.slice(0, 10).map(c => `• ${c}`).join('\n');
+  const moreCount = conditions.length > 10 ? `\n_...and ${conditions.length - 10} more_` : '';
+
   const helpText = lang === 'sw'
-    ? `Samahani, sikupata mwongozo wa matibabu kwa "${text}". Jaribu kutafuta hali nyingine au dawa.\n\n**Mifano ya utafutaji:**\n• "Malaria treatment"\n• "Amoxicillin dosage"\n• "Hypertension guidelines"`
-    : `I couldn't find a treatment guideline for "${text}". Try searching for a specific condition or medication.\n\n**Example searches:**\n• "Malaria treatment"\n• "Amoxicillin dosage"\n• "Hypertension guidelines"`;
+    ? `Samahani, sikupata mwongozo wa matibabu kwa "${text}".\n\n**Miongozo inayopatikana:**\n${conditionList}${moreCount}\n\nJaribu kutafuta kwa jina la hali au dawa.`
+    : `I couldn't find a treatment guideline for "${text}".\n\n**Available guidelines include:**\n${conditionList}${moreCount}\n\nTry searching by condition name or medication (e.g., "Amoxicillin", "measles", "hypertension").`;
 
   return {
     type: 'bot',
     content: helpText,
-    suggestions: ['List available guidelines', 'Malaria treatment', 'Dosage calculator'],
+    suggestions: ['List all guidelines', 'Malaria treatment', 'Hypertension', 'Measles'],
     category: 'medical'
   };
 }
