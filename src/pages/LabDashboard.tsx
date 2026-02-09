@@ -10,7 +10,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Activity
+  Activity,
+  Shield
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -37,6 +38,7 @@ import LabTestCatalog from "@/components/lab/LabTestCatalog";
 import LabAnalytics from "@/components/lab/LabAnalytics";
 import SmartNotifications from "@/components/lab/SmartNotifications";
 import PatientManagement from "@/components/lab/PatientManagement";
+import PrepPepManagement from "@/components/lab/PrepPepManagement";
 
 const LabDashboard = () => {
   const { user } = useAuth();
@@ -86,12 +88,13 @@ const LabDashboard = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         {/* Tab Navigation */}
         <div className="rounded-xl border border-border bg-card p-1">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 bg-transparent gap-1">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 bg-transparent gap-1">
             {[
               { value: "overview", icon: Activity, label: "Overview" },
               { value: "appointments", icon: Calendar, label: "Appointments" },
               { value: "results", icon: FileText, label: "Results" },
               { value: "catalog", icon: TestTube, label: "Catalog" },
+              { value: "prep-pep", icon: Shield, label: "PrEP/PEP" },
               { value: "analytics", icon: BarChart3, label: "Analytics" },
               { value: "notifications", icon: Bell, label: "Notifications" },
               { value: "patients", icon: Users, label: "Patients" },
@@ -298,6 +301,21 @@ const LabDashboard = () => {
             </CardHeader>
             <CardContent className="p-6">
               <LabAnalytics />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* PrEP/PEP Tab */}
+        <TabsContent value="prep-pep" className="space-y-6 mt-0">
+          <Card className="border-border">
+            <CardHeader className="border-b border-border">
+              <CardTitle className="text-foreground">PrEP & PEP Services</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage HIV prevention services — PrEP and PEP availability, stock, and bookings
+              </p>
+            </CardHeader>
+            <CardContent className="p-6">
+              <PrepPepManagement />
             </CardContent>
           </Card>
         </TabsContent>

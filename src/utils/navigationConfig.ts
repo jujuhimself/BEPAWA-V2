@@ -61,6 +61,7 @@ export class NavigationMenuConfig {
         { label: "Appointments", icon: React.createElement(Calendar, { className: "w-4 h-4" }), href: "/appointments" },
         { label: "Health Records", icon: React.createElement(Heart, { className: "w-4 h-4" }), href: "/health-records" },
         { label: "Bepawa Care", icon: React.createElement(Shield, { className: "w-4 h-4" }), href: "/bepawa-care" },
+        { label: "PrEP & PEP", icon: React.createElement(Heart, { className: "w-4 h-4" }), href: "/prep-pep" },
         { label: "Settings", icon: React.createElement(Settings, { className: "w-4 h-4" }), href: "/settings" },
       ],
       retail: [
@@ -97,6 +98,7 @@ export class NavigationMenuConfig {
         { label: "Test Catalog", icon: React.createElement(TestTube, { className: "w-4 h-4" }), href: "/lab/test-catalog" },
         { label: "Appointments", icon: React.createElement(Calendar, { className: "w-4 h-4" }), href: "/lab/appointments" },
         { label: "Results Management", icon: React.createElement(Database, { className: "w-4 h-4" }), href: "/lab/results" },
+        { label: "PrEP & PEP", icon: React.createElement(Shield, { className: "w-4 h-4" }), href: "/lab" },
         { label: "Quality Control", icon: React.createElement(Shield, { className: "w-4 h-4" }), href: "/lab/quality-control" },
         { label: "Subscription", icon: React.createElement(CreditCard, { className: "w-4 h-4" }), href: "/subscription" },
         { label: "Settings", icon: React.createElement(Settings, { className: "w-4 h-4" }), href: "/settings" },
@@ -134,6 +136,7 @@ export class NavigationMenuConfig {
       "Appointments": "Health",
       "Health Records": "Health",
       "Bepawa Care": "Health",
+      "PrEP & PEP": "Health",
       "Test Catalog": "Lab Services",
       "Results Management": "Lab Services",
       "Quality Control": "Lab Services",
