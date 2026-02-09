@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { comprehensiveNotificationService } from './comprehensiveNotificationService';
+import { smsService } from './smsService';
 
 // COD Order Statuses for Dodoma Pilot
 export const COD_ORDER_STATUSES = {
@@ -134,6 +135,30 @@ class DeliveryService {
       );
     }
 
+    // --- SMS Notifications (fire-and-forget) ---
+    // Fetch pharmacy phone for SMS
+    const { data: pharmacyProfile } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', orderData.pharmacy_id)
+      .single();
+
+    smsService.notifyOrderPlaced({
+      sellerPhone: pharmacyProfile?.phone || '',
+      sellerName: pharmacy?.pharmacy_name || 'Pharmacy',
+      orderNumber,
+      buyerName: customer?.name || 'Customer',
+      totalAmount: orderData.total_amount,
+      orderId: order.id,
+    });
+    smsService.notifyBuyerOrderPlaced({
+      buyerPhone: orderData.delivery_phone,
+      orderNumber,
+      totalAmount: orderData.total_amount,
+      sellerName: pharmacy?.pharmacy_name || 'Pharmacy',
+      orderId: order.id,
+    });
+
     // Log audit
     await this.logAudit('order_created', 'order', order.id, {
       order_number: orderNumber,
@@ -206,6 +231,19 @@ class DeliveryService {
         COD_ORDER_STATUSES.PREPARING_ORDER
       );
     }
+
+    // --- SMS: notify buyer order accepted ---
+    const { data: pharmacyInfo } = await supabase
+      .from('profiles')
+      .select('pharmacy_name')
+      .eq('id', user.id)
+      .single();
+    smsService.notifyOrderAccepted({
+      buyerPhone: order.delivery_phone || '',
+      orderNumber: order.order_number,
+      sellerName: pharmacyInfo?.pharmacy_name || 'Pharmacy',
+      orderId: orderId,
+    });
 
     await this.logAudit('order_accepted', 'order', orderId, { status: COD_ORDER_STATUSES.PREPARING_ORDER });
   }
@@ -365,6 +403,24 @@ class DeliveryService {
         'assigned'
       );
     }
+
+    // --- SMS: notify buyer & rider about assignment ---
+    const { data: riderProfile } = await supabase
+      .from('profiles')
+      .select('name, phone')
+      .eq('id', riderId)
+      .single();
+
+    smsService.notifyRiderAssigned({
+      buyerPhone: order.delivery_phone || '',
+      riderPhone: riderProfile?.phone || '',
+      riderName: riderProfile?.name || 'Rider',
+      orderNumber: order.order_number,
+      pickupAddress: pharmacy?.address || 'Pharmacy',
+      deliveryAddress: order.delivery_address || '',
+      totalAmount: order.total_amount,
+      orderId: orderId,
+    });
 
     await this.logAudit('rider_assigned', 'delivery_assignment', assignment.id, { 
       order_id: orderId, 
@@ -564,7 +620,7 @@ class DeliveryService {
       // Get customer email separately
       const { data: profile } = await supabase
         .from('profiles')
-        .select('email')
+        .select('email, phone')
         .eq('id', order.user_id)
         .single();
       
@@ -575,6 +631,21 @@ class DeliveryService {
         COD_ORDER_STATUSES.OUT_FOR_DELIVERY,
         COD_ORDER_STATUSES.DELIVERED_AND_PAID
       );
+
+      // --- SMS: notify buyer & seller order delivered ---
+      const { data: sellerProfile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', assignment.pharmacy_id)
+        .single();
+
+      smsService.notifyDeliveredAndPaid({
+        buyerPhone: order.delivery_phone || profile?.phone || '',
+        sellerPhone: sellerProfile?.phone || '',
+        orderNumber: order.order_number,
+        totalAmount: cashAmount,
+        orderId: assignment.order_id,
+      });
     }
 
     await this.logAudit('order_delivered', 'delivery_assignment', assignmentId, {
@@ -902,6 +973,19 @@ class DeliveryService {
       );
     }
 
+    // --- SMS: notify retailer order accepted by wholesaler ---
+    const { data: wsInfo } = await supabase
+      .from('profiles')
+      .select('business_name')
+      .eq('id', user.id)
+      .single();
+    smsService.notifyOrderAccepted({
+      buyerPhone: order.delivery_phone || '',
+      orderNumber: order.order_number,
+      sellerName: wsInfo?.business_name || 'Wholesaler',
+      orderId: orderId,
+    });
+
     await this.logAudit('wholesale_order_accepted', 'order', orderId, { status: COD_ORDER_STATUSES.PREPARING_ORDER });
   }
 
@@ -1064,6 +1148,24 @@ class DeliveryService {
       );
     }
 
+    // --- SMS: notify retailer & rider about assignment ---
+    const { data: riderProfile } = await supabase
+      .from('profiles')
+      .select('name, phone')
+      .eq('id', riderId)
+      .single();
+
+    smsService.notifyRiderAssigned({
+      buyerPhone: order.delivery_phone || retailer?.phone || '',
+      riderPhone: riderProfile?.phone || '',
+      riderName: riderProfile?.name || 'Rider',
+      orderNumber: order.order_number,
+      pickupAddress: wholesaler?.address || 'Wholesaler',
+      deliveryAddress: order.delivery_address || retailer?.address || '',
+      totalAmount: order.total_amount,
+      orderId: orderId,
+    });
+
     await this.logAudit('wholesale_rider_assigned', 'delivery_assignment', assignment.id, { 
       order_id: orderId, 
       rider_id: riderId 
@@ -1149,6 +1251,29 @@ class DeliveryService {
         wholesaler?.business_name || 'Wholesaler'
       );
     }
+
+    // --- SMS: notify wholesaler & retailer about new order ---
+    const { data: wholesalerPhone } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', orderData.wholesaler_id)
+      .single();
+
+    smsService.notifyOrderPlaced({
+      sellerPhone: wholesalerPhone?.phone || '',
+      sellerName: wholesaler?.business_name || 'Wholesaler',
+      orderNumber,
+      buyerName: retailer?.pharmacy_name || retailer?.name || 'Retailer',
+      totalAmount: orderData.total_amount,
+      orderId: order.id,
+    });
+    smsService.notifyBuyerOrderPlaced({
+      buyerPhone: orderData.delivery_phone,
+      orderNumber,
+      totalAmount: orderData.total_amount,
+      sellerName: wholesaler?.business_name || 'Wholesaler',
+      orderId: order.id,
+    });
 
     // Log audit
     await this.logAudit('wholesale_order_created', 'order', order.id, {
