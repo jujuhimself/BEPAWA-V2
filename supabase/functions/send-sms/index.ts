@@ -109,16 +109,26 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else {
-      // Update log with failure
       const errorMsg = twilioData.message || "Unknown Twilio error";
+      const isTrial = errorMsg.includes("unverified") || errorMsg.includes("Trial accounts");
+
       if (logId) {
         await supabase
           .from("sms_logs")
-          .update({ status: "failed", error_message: errorMsg })
+          .update({ status: isTrial ? "skipped_trial" : "failed", error_message: errorMsg })
           .eq("id", logId);
       }
 
-      console.error(`SMS failed to ${formattedPhone}: ${errorMsg}`);
+      console.warn(`SMS ${isTrial ? "skipped (trial)" : "failed"} to ${formattedPhone}: ${errorMsg}`);
+
+      // Return 200 for trial limitations so it doesn't block the order flow
+      if (isTrial) {
+        return new Response(
+          JSON.stringify({ success: false, skipped: true, reason: "Twilio trial account – recipient not verified" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ success: false, error: errorMsg }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
