@@ -55,10 +55,24 @@ const WholesaleOrdering = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        // Fetch only wholesale products from wholesaler users
+        const { data: wholesalerProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'wholesale');
+
+        const wholesalerIds = (wholesalerProfiles || []).map((p: any) => p.id);
+
+        if (wholesalerIds.length === 0) {
+          setProducts([]);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .eq('user_id', user?.id)
+          .in('user_id', wholesalerIds)
+          .eq('is_wholesale_product', true)
           .order('name');
 
         if (error) {
