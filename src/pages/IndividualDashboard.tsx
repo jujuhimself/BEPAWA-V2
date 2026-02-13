@@ -216,14 +216,14 @@ const IndividualDashboard = () => {
             title="HIV Self-Test Kits"
             description="Order discreetly"
             icon={<Package className="h-5 w-5" />}
-            href="/prep-pep"
+            href="/dashboard/personal-health#hiv"
             variant="warning"
           />
           <QuickActionCard
             title="Circumcision"
             description="Book safely"
             icon={<Star className="h-5 w-5" />}
-            href="/prep-pep"
+            href="/dashboard/personal-health#circumcision"
             variant="info"
           />
           <QuickActionCard
