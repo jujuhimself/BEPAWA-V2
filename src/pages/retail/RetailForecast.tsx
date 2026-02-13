@@ -123,12 +123,12 @@ export default function RetailForecast() {
                 <tbody>
                   {filtered.slice(0, 20).map(f => (
                     <tr key={f.id}>
-                      <td>{f.product_id}</td>
+                      <td>{f.product_name || f.product_id}</td>
                       <td>{f.forecast_date}</td>
                       <td>{f.forecasted_demand}</td>
                       <td>{f.actual ?? "-"}</td>
-                      <td className="text-blue-800">{f.user_id}</td>
-                      <td>{f.id}</td>
+                      <td className="text-blue-800">{f.user_id?.slice(0, 8)}</td>
+                      <td>{f.id.slice(0, 8)}</td>
                     </tr>
                   ))}
                 </tbody>

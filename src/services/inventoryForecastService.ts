@@ -5,6 +5,7 @@ export interface InventoryForecast {
   id: string;
   user_id: string;
   product_id: string;
+  product_name?: string;
   forecast_date: string;
   forecasted_demand: number;
   actual?: number;
@@ -31,7 +32,25 @@ class InventoryForecastService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    
+    const forecasts = data || [];
+    
+    // Fetch product names for all unique product IDs
+    const productIds = [...new Set(forecasts.map(f => f.product_id))];
+    if (productIds.length > 0) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name')
+        .in('id', productIds);
+      
+      const productMap = new Map((products || []).map(p => [p.id, p.name]));
+      return forecasts.map(f => ({
+        ...f,
+        product_name: productMap.get(f.product_id) || f.product_id,
+      }));
+    }
+    
+    return forecasts;
   }
 
   async updateActual(id: string, actual: number) {
