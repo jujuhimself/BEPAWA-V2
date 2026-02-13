@@ -13,28 +13,27 @@ import {
   Clock, 
   DollarSign, 
   Download,
-  Calendar,
-  BarChart3,
-  PieChart
+  Loader2
 } from "lucide-react";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, eachDayOfInterval } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AnalyticsData {
   totalAppointments: number;
   completedTests: number;
   pendingTests: number;
   revenue: number;
-  avgTurnaroundTime: number;
-  patientSatisfaction: number;
+  avgTurnaroundHours: number;
 }
 
 interface TestMetrics {
   testType: string;
   count: number;
   revenue: number;
-  avgTurnaroundTime: number;
+  completed: number;
+  pending: number;
 }
 
 interface DailyMetrics {
@@ -45,14 +44,21 @@ interface DailyMetrics {
 }
 
 const LabAnalytics = () => {
+  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState("7d");
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
     totalAppointments: 0,
     completedTests: 0,
     pendingTests: 0,
     revenue: 0,
-    avgTurnaroundTime: 0,
-    patientSatisfaction: 0
+    avgTurnaroundHours: 0
+  });
+  const [prevAnalytics, setPrevAnalytics] = useState<AnalyticsData>({
+    totalAppointments: 0,
+    completedTests: 0,
+    pendingTests: 0,
+    revenue: 0,
+    avgTurnaroundHours: 0
   });
   const [testMetrics, setTestMetrics] = useState<TestMetrics[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetrics[]>([]);
@@ -60,73 +66,131 @@ const LabAnalytics = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchAnalyticsData();
-  }, [timeRange]);
+    if (user) fetchAnalyticsData();
+  }, [timeRange, user]);
 
   const fetchAnalyticsData = async () => {
+    if (!user) return;
     setIsLoading(true);
     try {
       const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
-      const startDate = subDays(new Date(), days);
+      const endDate = new Date();
+      const startDate = subDays(endDate, days - 1);
+      const prevStart = subDays(startDate, days);
+      const start = startDate.toISOString();
+      const prevStartStr = prevStart.toISOString();
 
-      // Fetch appointments
+      // Current period appointments
       const { data: appointments } = await supabase
         .from('appointments')
         .select('*')
-        .gte('created_at', startDate.toISOString())
-        .eq('provider_type', 'lab');
+        .eq('provider_id', user.id)
+        .eq('provider_type', 'lab')
+        .gte('created_at', start);
 
-      // Fetch lab results
-      const { data: results } = await supabase
-        .from('lab_results')
+      // Previous period for comparison
+      const { data: prevAppointments } = await supabase
+        .from('appointments')
         .select('*')
-        .gte('created_at', startDate.toISOString());
+        .eq('provider_id', user.id)
+        .eq('provider_type', 'lab')
+        .gte('created_at', prevStartStr)
+        .lt('created_at', start);
 
-      // Calculate metrics
+      // Lab orders for revenue
+      const { data: labOrders } = await supabase
+        .from('lab_orders')
+        .select('*, lab_order_items(*)')
+        .eq('lab_id', user.id)
+        .gte('created_at', start);
+
+      const { data: prevLabOrders } = await supabase
+        .from('lab_orders')
+        .select('total_amount, status')
+        .eq('lab_id', user.id)
+        .gte('created_at', prevStartStr)
+        .lt('created_at', start);
+
       const totalAppointments = appointments?.length || 0;
-      const completedTests = results?.filter(r => r.status === 'approved').length || 0;
-      const pendingTests = results?.filter(r => r.status === 'draft').length || 0;
-      
-      // Mock revenue calculation (in real app, this would come from billing)
-      const revenue = completedTests * 50; // Average $50 per test
-      
-      // Mock turnaround time (in real app, this would be calculated from actual data)
-      const avgTurnaroundTime = 24; // hours
-      
-      // Mock patient satisfaction (in real app, this would come from surveys)
-      const patientSatisfaction = 4.2; // out of 5
+      const completedTests = (appointments || []).filter(a => a.status === 'completed').length;
+      const pendingTests = (appointments || []).filter(a => a.status === 'scheduled' || a.status === 'pending').length;
+      const revenue = (labOrders || []).reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
-      setAnalyticsData({
-        totalAppointments,
-        completedTests,
-        pendingTests,
-        revenue,
-        avgTurnaroundTime,
-        patientSatisfaction
+      // Calculate avg turnaround from completed appointments
+      let totalHours = 0;
+      let completedCount = 0;
+      (appointments || []).forEach((a: any) => {
+        if (a.status === 'completed' && a.created_at && a.updated_at) {
+          const created = new Date(a.created_at).getTime();
+          const updated = new Date(a.updated_at).getTime();
+          const hours = (updated - created) / (1000 * 60 * 60);
+          if (hours > 0 && hours < 720) { // sanity check < 30 days
+            totalHours += hours;
+            completedCount++;
+          }
+        }
+      });
+      const avgTurnaroundHours = completedCount > 0 ? Math.round(totalHours / completedCount) : 0;
+
+      setAnalyticsData({ totalAppointments, completedTests, pendingTests, revenue, avgTurnaroundHours });
+
+      const prevCompletedTests = (prevAppointments || []).filter(a => a.status === 'completed').length;
+      const prevRevenue = (prevLabOrders || []).reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+      setPrevAnalytics({
+        totalAppointments: prevAppointments?.length || 0,
+        completedTests: prevCompletedTests,
+        pendingTests: 0,
+        revenue: prevRevenue,
+        avgTurnaroundHours: 0,
       });
 
-      // Generate test metrics
-      const testTypes = ['CBC', 'CMP', 'Lipid Panel', 'Thyroid', 'A1C', 'Urinalysis'];
-      const mockTestMetrics: TestMetrics[] = testTypes.map(type => ({
-        testType: type,
-        count: Math.floor(Math.random() * 50) + 10,
-        revenue: Math.floor(Math.random() * 2000) + 500,
-        avgTurnaroundTime: Math.floor(Math.random() * 48) + 12
-      }));
-      setTestMetrics(mockTestMetrics);
+      // Test metrics by service_type
+      const typeMap: Record<string, TestMetrics> = {};
+      (appointments || []).forEach((a: any) => {
+        const type = a.service_type || 'Other';
+        if (!typeMap[type]) {
+          typeMap[type] = { testType: type, count: 0, revenue: 0, completed: 0, pending: 0 };
+        }
+        typeMap[type].count++;
+        if (a.status === 'completed') typeMap[type].completed++;
+        if (a.status === 'scheduled' || a.status === 'pending') typeMap[type].pending++;
+      });
 
-      // Generate daily metrics
-      const dailyData: DailyMetrics[] = [];
-      for (let i = days - 1; i >= 0; i--) {
-        const date = subDays(new Date(), i);
-        dailyData.push({
-          date: format(date, 'MMM dd'),
-          appointments: Math.floor(Math.random() * 20) + 5,
-          completed: Math.floor(Math.random() * 15) + 3,
-          revenue: Math.floor(Math.random() * 1000) + 200
+      // Match lab order items to test types for revenue
+      (labOrders || []).forEach((order: any) => {
+        (order.lab_order_items || []).forEach((item: any) => {
+          const type = item.test_name || 'Other';
+          if (typeMap[type]) {
+            typeMap[type].revenue += Number(item.test_price || 0);
+          }
         });
-      }
-      setDailyMetrics(dailyData);
+      });
+
+      setTestMetrics(Object.values(typeMap).sort((a, b) => b.count - a.count));
+
+      // Daily metrics
+      const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+      const dayMap: Record<string, DailyMetrics> = {};
+      allDays.forEach(d => {
+        dayMap[format(d, 'yyyy-MM-dd')] = { date: format(d, 'MMM dd'), appointments: 0, completed: 0, revenue: 0 };
+      });
+
+      (appointments || []).forEach((a: any) => {
+        const day = format(new Date(a.created_at), 'yyyy-MM-dd');
+        if (dayMap[day]) {
+          dayMap[day].appointments++;
+          if (a.status === 'completed') dayMap[day].completed++;
+        }
+      });
+
+      (labOrders || []).forEach((o: any) => {
+        const day = format(new Date(o.created_at), 'yyyy-MM-dd');
+        if (dayMap[day]) {
+          dayMap[day].revenue += Number(o.total_amount || 0);
+        }
+      });
+
+      setDailyMetrics(allDays.map(d => dayMap[format(d, 'yyyy-MM-dd')]));
 
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -140,32 +204,25 @@ const LabAnalytics = () => {
     }
   };
 
+  const getGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? '+100%' : '0%';
+    const pct = ((current - previous) / previous * 100).toFixed(1);
+    return `${Number(pct) >= 0 ? '+' : ''}${pct}%`;
+  };
+
   const exportReport = () => {
-    // In a real app, this would generate and download a PDF/Excel report
     toast({
       title: "Report Exported",
       description: "Analytics report has been downloaded.",
     });
   };
 
-  const getTrendIcon = (current: number, previous: number) => {
-    if (current > previous) return <TrendingUp className="h-4 w-4 text-green-600" />;
-    if (current < previous) return <TrendingDown className="h-4 w-4 text-red-600" />;
-    return null;
-  };
-
-  const getTrendColor = (current: number, previous: number) => {
-    if (current > previous) return "text-green-600";
-    if (current < previous) return "text-red-600";
-    return "text-gray-600";
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading analytics...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="mt-2 text-muted-foreground">Loading analytics...</p>
         </div>
       </div>
     );
@@ -174,7 +231,7 @@ const LabAnalytics = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Analytics & Reporting</h2>
+        <h2 className="text-2xl font-bold text-foreground">Analytics & Reporting</h2>
         <div className="flex gap-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-32">
@@ -203,7 +260,7 @@ const LabAnalytics = () => {
           <CardContent>
             <div className="text-2xl font-bold">{analyticsData.totalAppointments}</div>
             <p className="text-xs text-muted-foreground">
-              +12% from last period
+              {getGrowth(analyticsData.totalAppointments, prevAnalytics.totalAppointments)} from prev period
             </p>
           </CardContent>
         </Card>
@@ -216,7 +273,7 @@ const LabAnalytics = () => {
           <CardContent>
             <div className="text-2xl font-bold">{analyticsData.completedTests}</div>
             <p className="text-xs text-muted-foreground">
-              +8% from last period
+              {getGrowth(analyticsData.completedTests, prevAnalytics.completedTests)} from prev period
             </p>
           </CardContent>
         </Card>
@@ -227,9 +284,9 @@ const LabAnalytics = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analyticsData.revenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">TZS {analyticsData.revenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              +15% from last period
+              {getGrowth(analyticsData.revenue, prevAnalytics.revenue)} from prev period
             </p>
           </CardContent>
         </Card>
@@ -240,9 +297,9 @@ const LabAnalytics = () => {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analyticsData.avgTurnaroundTime}h</div>
+            <div className="text-2xl font-bold">{analyticsData.avgTurnaroundHours}h</div>
             <p className="text-xs text-muted-foreground">
-              -2h from last period
+              Based on completed tests
             </p>
           </CardContent>
         </Card>
@@ -263,18 +320,22 @@ const LabAnalytics = () => {
                 <CardTitle>Daily Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {dailyMetrics.slice(-7).map((day, index) => (
-                    <div key={day.date} className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{day.date}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-600">{day.appointments} appointments</span>
-                        <span className="text-sm text-gray-600">{day.completed} completed</span>
-                        <span className="text-sm font-medium">${day.revenue}</span>
+                {dailyMetrics.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No data for this period</p>
+                ) : (
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {dailyMetrics.slice(-7).map((day) => (
+                      <div key={day.date} className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{day.date}</span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-muted-foreground">{day.appointments} appt</span>
+                          <span className="text-sm text-muted-foreground">{day.completed} done</span>
+                          <span className="text-sm font-medium">TZS {day.revenue.toLocaleString()}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -286,14 +347,14 @@ const LabAnalytics = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
                       <span className="text-sm">Completed</span>
                     </div>
                     <span className="text-sm font-medium">{analyticsData.completedTests}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                      <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
                       <span className="text-sm">Pending</span>
                     </div>
                     <span className="text-sm font-medium">{analyticsData.pendingTests}</span>
@@ -317,32 +378,36 @@ const LabAnalytics = () => {
               <CardTitle>Test Performance by Type</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Test Type</TableHead>
-                    <TableHead>Count</TableHead>
-                    <TableHead>Revenue</TableHead>
-                    <TableHead>Avg Turnaround</TableHead>
-                    <TableHead>Performance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {testMetrics.map((test) => (
-                    <TableRow key={test.testType}>
-                      <TableCell className="font-medium">{test.testType}</TableCell>
-                      <TableCell>{test.count}</TableCell>
-                      <TableCell>${test.revenue.toLocaleString()}</TableCell>
-                      <TableCell>{test.avgTurnaroundTime}h</TableCell>
-                      <TableCell>
-                        <Badge variant={test.avgTurnaroundTime <= 24 ? "default" : "secondary"}>
-                          {test.avgTurnaroundTime <= 24 ? "Good" : "Needs Improvement"}
-                        </Badge>
-                      </TableCell>
+              {testMetrics.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No test data for this period</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Test Type</TableHead>
+                      <TableHead>Count</TableHead>
+                      <TableHead>Completed</TableHead>
+                      <TableHead>Revenue</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {testMetrics.map((test) => (
+                      <TableRow key={test.testType}>
+                        <TableCell className="font-medium">{test.testType}</TableCell>
+                        <TableCell>{test.count}</TableCell>
+                        <TableCell>{test.completed}</TableCell>
+                        <TableCell>TZS {test.revenue.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={test.pending === 0 ? "default" : "secondary"}>
+                            {test.pending === 0 ? "All Done" : `${test.pending} pending`}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -354,17 +419,28 @@ const LabAnalytics = () => {
                 <CardTitle>Revenue Trends</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {dailyMetrics.slice(-7).map((day) => (
-                    <div key={day.date} className="flex items-center justify-between">
-                      <span className="text-sm">{day.date}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">${day.revenue}</span>
-                        {getTrendIcon(day.revenue, day.revenue - 50)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {dailyMetrics.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No data</p>
+                ) : (
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {dailyMetrics.slice(-7).map((day, i) => {
+                      const prev = i > 0 ? dailyMetrics.slice(-7)[i - 1].revenue : day.revenue;
+                      return (
+                        <div key={day.date} className="flex items-center justify-between">
+                          <span className="text-sm">{day.date}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">TZS {day.revenue.toLocaleString()}</span>
+                            {day.revenue > prev ? (
+                              <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            ) : day.revenue < prev ? (
+                              <TrendingDown className="h-4 w-4 text-red-600" />
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -373,17 +449,28 @@ const LabAnalytics = () => {
                 <CardTitle>Appointment Trends</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {dailyMetrics.slice(-7).map((day) => (
-                    <div key={day.date} className="flex items-center justify-between">
-                      <span className="text-sm">{day.date}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{day.appointments}</span>
-                        {getTrendIcon(day.appointments, day.appointments - 2)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {dailyMetrics.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No data</p>
+                ) : (
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {dailyMetrics.slice(-7).map((day, i) => {
+                      const prev = i > 0 ? dailyMetrics.slice(-7)[i - 1].appointments : day.appointments;
+                      return (
+                        <div key={day.date} className="flex items-center justify-between">
+                          <span className="text-sm">{day.date}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{day.appointments}</span>
+                            {day.appointments > prev ? (
+                              <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            ) : day.appointments < prev ? (
+                              <TrendingDown className="h-4 w-4 text-red-600" />
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -396,41 +483,21 @@ const LabAnalytics = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Daily Summary Report</h4>
-                  <p className="text-sm text-gray-600 mb-3">Overview of daily activities, appointments, and revenue</p>
-                  <Button size="sm">
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
-                </div>
-                
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Test Performance Report</h4>
-                  <p className="text-sm text-gray-600 mb-3">Detailed analysis of test types and turnaround times</p>
-                  <Button size="sm">
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
-                </div>
-                
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Revenue Analysis</h4>
-                  <p className="text-sm text-gray-600 mb-3">Financial performance and revenue trends</p>
-                  <Button size="sm">
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
-                </div>
-                
-                <div className="p-4 border rounded-lg">
-                  <h4 className="font-medium mb-2">Quality Metrics</h4>
-                  <p className="text-sm text-gray-600 mb-3">Quality indicators and patient satisfaction</p>
-                  <Button size="sm">
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
-                </div>
+                {[
+                  { title: "Daily Summary Report", desc: "Overview of daily activities, appointments, and revenue" },
+                  { title: "Test Performance Report", desc: "Detailed analysis of test types and completion rates" },
+                  { title: "Revenue Analysis", desc: "Financial performance and revenue trends" },
+                  { title: "Quality Metrics", desc: "Turnaround times and completion rates" },
+                ].map((report) => (
+                  <div key={report.title} className="p-4 border border-border rounded-lg">
+                    <h4 className="font-medium mb-2 text-foreground">{report.title}</h4>
+                    <p className="text-sm text-muted-foreground mb-3">{report.desc}</p>
+                    <Button size="sm" onClick={exportReport}>
+                      <Download className="h-3 w-3 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -440,4 +507,4 @@ const LabAnalytics = () => {
   );
 };
 
-export default LabAnalytics; 
+export default LabAnalytics;

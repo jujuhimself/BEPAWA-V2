@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   TrendingUp, 
+  TrendingDown,
   Package, 
   AlertTriangle, 
   ShoppingCart, 
@@ -15,6 +16,57 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionStatusCard } from "@/components/subscription/SubscriptionStatusCard";
+
+const GrowthCardInline = ({ userId }: { userId?: string }) => {
+  const [growth, setGrowth] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      const now = new Date();
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+      const { data: thisMonth } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('user_id', userId)
+        .gte('created_at', thisMonthStart.toISOString());
+
+      const { data: lastMonth } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('user_id', userId)
+        .gte('created_at', lastMonthStart.toISOString())
+        .lte('created_at', lastMonthEnd.toISOString());
+
+      const thisRev = (thisMonth || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+      const lastRev = (lastMonth || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+      const pct = lastRev > 0 ? ((thisRev - lastRev) / lastRev) * 100 : (thisRev > 0 ? 100 : 0);
+      setGrowth(pct);
+    })();
+  }, [userId]);
+
+  const isPositive = (growth || 0) >= 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">Growth</CardTitle>
+        {isPositive ? <TrendingUp className="h-4 w-4 text-muted-foreground" /> : <TrendingDown className="h-4 w-4 text-muted-foreground" />}
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+          {growth !== null ? `${isPositive ? '+' : ''}${growth.toFixed(1)}%` : '—'}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          vs last month
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
 
 interface DashboardStats {
   totalProducts: number;
@@ -276,18 +328,7 @@ const RetailDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Growth</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+12%</div>
-            <p className="text-xs text-muted-foreground">
-              vs last month
-            </p>
-          </CardContent>
-        </Card>
+        <GrowthCardInline userId={user?.id} />
       </div>
 
       {/* Top Products and Recent Orders */}
