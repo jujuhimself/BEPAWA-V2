@@ -7,11 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Shield, MapPin, Phone, Pill, CheckCircle, MessageCircle, Calendar, Heart } from 'lucide-react';
+import { Shield, MapPin, Phone, Pill, MessageCircle, Heart, Truck, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import PageHeader from '@/components/PageHeader';
 import { useAvailablePrepPepServices, useCreatePrepPepBooking, useMyPrepPepBookings } from '@/hooks/usePrepPep';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
+import LocationPicker, { LocationData } from '@/components/delivery/LocationPicker';
+import { calculateDeliveryFee, calculateDistance, formatTZS, MAX_DELIVERY_DISTANCE_KM, DELIVERY_PRICE_TIERS } from '@/utils/deliveryPricing';
+
+const DEFAULT_FACILITY_LOCATION = { latitude: -6.1630, longitude: 35.7516 };
 
 const PrepPepServices = () => {
   const { user } = useAuth();
@@ -31,28 +36,44 @@ const PrepPepServices = () => {
     special_instructions: '',
   });
 
+  // COD delivery state
+  const [deliveryLocation, setDeliveryLocation] = useState<LocationData | null>(null);
+  const [deliveryDistance, setDeliveryDistance] = useState(0);
+
   const openBooking = (service: any) => {
     setSelectedService(service);
     setBookingForm(f => ({ ...f, patient_name: user?.name || '' }));
+    setDeliveryLocation(null);
+    setDeliveryDistance(0);
     setBookingDialog(true);
   };
 
+  const facilityLocation = selectedService?.lab
+    ? { latitude: selectedService.lab.latitude || DEFAULT_FACILITY_LOCATION.latitude, longitude: selectedService.lab.longitude || DEFAULT_FACILITY_LOCATION.longitude }
+    : DEFAULT_FACILITY_LOCATION;
+
+  const deliveryFee = deliveryLocation ? calculateDeliveryFee(deliveryDistance) : 0;
+
   const handleBook = () => {
-    if (!selectedService || !bookingForm.patient_name) return;
+    if (!selectedService || !bookingForm.patient_name || !bookingForm.patient_phone || !deliveryLocation) return;
     createBooking.mutate({
       lab_id: selectedService.lab_id,
       service_type: selectedService.service_type,
-      total_amount: selectedService.price,
+      total_amount: selectedService.price + deliveryFee,
       booking_date: bookingForm.booking_date,
       booking_time: bookingForm.booking_time || undefined,
       patient_name: bookingForm.patient_name,
       patient_phone: bookingForm.patient_phone || undefined,
       patient_age: bookingForm.patient_age ? Number(bookingForm.patient_age) : undefined,
       patient_gender: bookingForm.patient_gender || undefined,
-      special_instructions: bookingForm.special_instructions || undefined,
+      special_instructions: `Delivery: ${deliveryLocation.address}. Coords: ${deliveryLocation.latitude},${deliveryLocation.longitude}. ${bookingForm.special_instructions || ''}`.trim(),
       payment_method: 'cod',
     }, {
-      onSuccess: () => setBookingDialog(false),
+      onSuccess: () => {
+        setBookingDialog(false);
+        setDeliveryLocation(null);
+        setDeliveryDistance(0);
+      },
     });
   };
 
@@ -63,6 +84,16 @@ const PrepPepServices = () => {
     if (!labMap.has(key)) labMap.set(key, { lab: s.lab, services: [] });
     labMap.get(key)!.services.push(s);
   });
+
+  const getServiceLabel = (type: string) => {
+    switch (type) {
+      case 'prep': return 'PrEP';
+      case 'pep': return 'PEP';
+      case 'hiv_self_test': return 'HIV Self-Test Kit';
+      case 'circumcision': return 'Circumcision';
+      default: return type.toUpperCase();
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
@@ -79,7 +110,7 @@ const PrepPepServices = () => {
       <div className="container mx-auto px-4 py-8 space-y-8">
         <PageHeader
           title="PrEP & PEP Services"
-          description="Access HIV prevention services — confidential, stigma-free, and available near you."
+          description="Access HIV prevention services — confidential, stigma-free, and available near you. Pay Cash on Delivery."
           badge={{ text: "HIV Prevention", variant: "outline" }}
         />
 
@@ -92,7 +123,7 @@ const PrepPepServices = () => {
                 <div>
                   <h3 className="font-bold text-lg">PrEP (Pre-Exposure Prophylaxis)</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    A daily medicine taken <strong>before</strong> potential HIV exposure to prevent infection. Highly effective when taken consistently.
+                    A daily medicine taken <strong>before</strong> potential HIV exposure to prevent infection.
                   </p>
                 </div>
               </div>
@@ -105,7 +136,7 @@ const PrepPepServices = () => {
                 <div>
                   <h3 className="font-bold text-lg">PEP (Post-Exposure Prophylaxis)</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Emergency medicine taken <strong>within 72 hours after</strong> potential HIV exposure. Must be started ASAP for effectiveness.
+                    Emergency medicine taken <strong>within 72 hours after</strong> potential HIV exposure.
                   </p>
                 </div>
               </div>
@@ -119,9 +150,7 @@ const PrepPepServices = () => {
             <MessageCircle className="h-8 w-8 text-primary shrink-0" />
             <div className="flex-1">
               <h3 className="font-bold">Not sure which service you need?</h3>
-              <p className="text-sm text-muted-foreground">
-                Our AI-powered assistant can help assess your situation, provide education, and guide you confidentially.
-              </p>
+              <p className="text-sm text-muted-foreground">Our AI assistant can help assess your situation confidentially.</p>
             </div>
             <Button asChild variant="outline">
               <Link to="/bepawa-care">Talk to AI Assistant</Link>
@@ -157,13 +186,13 @@ const PrepPepServices = () => {
                       <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{s.service_type === 'prep' ? 'PrEP' : 'PEP'}</span>
+                            <span className="font-medium">{getServiceLabel(s.service_type)}</span>
                             <Badge variant="outline" className="text-xs text-emerald-600">
                               {s.stock_status === 'available' ? 'In Stock' : 'Out of Stock'}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            TZS {s.price.toLocaleString()}
+                            TZS {s.price.toLocaleString()} • COD
                             {s.consultation_required && ' • Consultation required'}
                           </p>
                         </div>
@@ -189,7 +218,7 @@ const PrepPepServices = () => {
                   <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">{b.service_type.toUpperCase()}</span>
+                        <span className="font-semibold">{getServiceLabel(b.service_type)}</span>
                         {getStatusBadge(b.status)}
                         <Badge variant="outline">{b.payment_status}</Badge>
                       </div>
@@ -206,29 +235,89 @@ const PrepPepServices = () => {
         )}
       </div>
 
-      {/* Booking Dialog */}
+      {/* Booking Dialog with COD */}
       <Dialog open={bookingDialog} onOpenChange={setBookingDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Book {selectedService?.service_type === 'prep' ? 'PrEP' : 'PEP'} Service
+              Book {getServiceLabel(selectedService?.service_type)} — Cash on Delivery
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                Pay cash when your order is delivered by our Boda rider
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label>Full Name *</Label>
               <Input value={bookingForm.patient_name} onChange={(e) => setBookingForm(f => ({ ...f, patient_name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={bookingForm.patient_phone} onChange={(e) => setBookingForm(f => ({ ...f, patient_phone: e.target.value }))} placeholder="+255..." />
+                <Label className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> Phone *</Label>
+                <Input value={bookingForm.patient_phone} onChange={(e) => setBookingForm(f => ({ ...f, patient_phone: e.target.value }))} placeholder="+255 7XX XXX XXX" required />
               </div>
               <div className="space-y-2">
                 <Label>Age</Label>
                 <Input type="number" value={bookingForm.patient_age} onChange={(e) => setBookingForm(f => ({ ...f, patient_age: e.target.value }))} />
               </div>
             </div>
+
+            {/* Delivery Location with Map */}
+            <div>
+              <Label className="flex items-center gap-1 mb-2">
+                <MapPin className="h-4 w-4" /> Delivery Location *
+              </Label>
+              <LocationPicker
+                onLocationSelect={(location) => {
+                  setDeliveryLocation(location);
+                  const distance = calculateDistance(
+                    facilityLocation.latitude, facilityLocation.longitude,
+                    location.latitude, location.longitude
+                  );
+                  setDeliveryDistance(distance);
+                }}
+                pharmacyLocation={facilityLocation}
+                placeholder="Search for your delivery location..."
+              />
+              {deliveryLocation && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{deliveryDistance.toFixed(1)} km</Badge>
+                      <span className="text-sm text-muted-foreground">from facility</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-primary">{formatTZS(deliveryFee)}</p>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Info className="h-3 w-3" /> Delivery fee
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="font-medium mb-1">Delivery Pricing</p>
+                            <ul className="text-xs space-y-0.5">
+                              {DELIVERY_PRICE_TIERS.map((tier, i) => (
+                                <li key={i}>{tier.minKm}-{tier.maxKm} km: {formatTZS(tier.price)}</li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                  {deliveryDistance > MAX_DELIVERY_DISTANCE_KM && (
+                    <p className="text-xs text-amber-600 mt-2">⚠️ Beyond standard delivery range ({MAX_DELIVERY_DISTANCE_KM} km)</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Date *</Label>
@@ -240,12 +329,15 @@ const PrepPepServices = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Special Instructions</Label>
-              <Textarea value={bookingForm.special_instructions} onChange={(e) => setBookingForm(f => ({ ...f, special_instructions: e.target.value }))} placeholder="Any additional notes..." />
+              <Label>Delivery Notes (optional)</Label>
+              <Textarea value={bookingForm.special_instructions} onChange={(e) => setBookingForm(f => ({ ...f, special_instructions: e.target.value }))} placeholder="Any special instructions for the rider..." />
             </div>
+
             <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
-              <div className="flex justify-between"><span>Service:</span><span className="font-medium">{selectedService?.service_type?.toUpperCase()}</span></div>
-              <div className="flex justify-between"><span>Amount:</span><span className="font-bold">TZS {selectedService?.price?.toLocaleString()}</span></div>
+              <div className="flex justify-between"><span>Service:</span><span className="font-medium">{getServiceLabel(selectedService?.service_type)}</span></div>
+              <div className="flex justify-between"><span>Service Fee:</span><span>TZS {selectedService?.price?.toLocaleString()}</span></div>
+              {deliveryLocation && <div className="flex justify-between"><span>Delivery Fee:</span><span>{formatTZS(deliveryFee)}</span></div>}
+              <div className="flex justify-between font-bold border-t pt-1"><span>Total:</span><span>TZS {((selectedService?.price || 0) + deliveryFee).toLocaleString()}</span></div>
               <div className="flex justify-between"><span>Payment:</span><span>Cash on Delivery</span></div>
               {selectedService?.consultation_required && (
                 <div className="text-amber-600 flex items-center gap-1 mt-1">
@@ -256,8 +348,13 @@ const PrepPepServices = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBookingDialog(false)}>Cancel</Button>
-            <Button onClick={handleBook} disabled={createBooking.isPending || !bookingForm.patient_name}>
-              {createBooking.isPending ? 'Booking...' : 'Confirm Booking (COD)'}
+            <Button
+              className="flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white"
+              onClick={handleBook}
+              disabled={createBooking.isPending || !bookingForm.patient_name || !bookingForm.patient_phone || !deliveryLocation}
+            >
+              <Truck className="h-4 w-4" />
+              {createBooking.isPending ? 'Booking...' : 'Place COD Order'}
             </Button>
           </DialogFooter>
         </DialogContent>
