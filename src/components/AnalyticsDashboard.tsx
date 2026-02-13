@@ -5,16 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { analyticsService } from '@/services/analyticsService';
 import { supabase } from '@/integrations/supabase/client';
-
-interface AnalyticsData {
-  revenue: { period: string; amount: number; }[];
-  orders: { period: string; count: number; }[];
-  topProducts: { name: string; sales: number; revenue: number; }[];
-  customerMetrics: { newCustomers: number; returningCustomers: number; totalCustomers: number; };
-  inventoryTurnover: { product: string; turnoverRate: number; daysInStock: number; }[];
-}
+import { format, subDays, eachDayOfInterval } from 'date-fns';
 
 export const AnalyticsDashboard = () => {
   const { user } = useAuth();
@@ -24,8 +16,12 @@ export const AnalyticsDashboard = () => {
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [ordersData, setOrdersData] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [totalProductsSold, setTotalProductsSold] = useState(0);
+  const [uniqueProductsSold, setUniqueProductsSold] = useState(0);
   const [customerMetrics, setCustomerMetrics] = useState<any>({ newCustomers: 0, returningCustomers: 0, totalCustomers: 0 });
   const [inventoryTurnover, setInventoryTurnover] = useState<any[]>([]);
+  const [prevPeriodRevenue, setPrevPeriodRevenue] = useState(0);
+  const [prevPeriodOrders, setPrevPeriodOrders] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -35,44 +31,163 @@ export const AnalyticsDashboard = () => {
       try {
         const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
         const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - days + 1);
-        const start = startDate.toISOString().split('T')[0];
-        const end = endDate.toISOString().split('T')[0];
+        const startDate = subDays(endDate, days - 1);
+        const prevStart = subDays(startDate, days);
+        const start = format(startDate, 'yyyy-MM-dd');
+        const end = format(endDate, 'yyyy-MM-dd');
+        const prevStartStr = format(prevStart, 'yyyy-MM-dd');
 
-        let orderQuery = supabase.from('orders').select('*');
-        if (user.role === 'retail') {
-          orderQuery = orderQuery.eq('pharmacy_id', user.id);
-        } else if (user.role === 'wholesale') {
-          orderQuery = orderQuery.eq('wholesaler_id', user.id);
+        // Build base query filters
+        const roleFilter = (q: any) => {
+          if (user.role === 'retail') return q.eq('pharmacy_id', user.id);
+          if (user.role === 'wholesale') return q.eq('wholesaler_id', user.id);
+          return q.eq('user_id', user.id);
+        };
+
+        // Current period orders
+        let currentQ = supabase.from('orders').select('id, total_amount, created_at, status');
+        currentQ = roleFilter(currentQ);
+        currentQ = currentQ.gte('created_at', start).lte('created_at', end + 'T23:59:59');
+        const { data: currentOrders } = await currentQ;
+
+        // Previous period orders for comparison
+        let prevQ = supabase.from('orders').select('id, total_amount');
+        prevQ = roleFilter(prevQ);
+        prevQ = prevQ.gte('created_at', prevStartStr).lt('created_at', start);
+        const { data: prevOrders } = await prevQ;
+
+        const prevRev = (prevOrders || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        setPrevPeriodRevenue(prevRev);
+        setPrevPeriodOrders((prevOrders || []).length);
+
+        // Build daily revenue & orders data
+        const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+        const dailyMap: Record<string, { revenue: number; orders: number }> = {};
+        allDays.forEach(d => {
+          dailyMap[format(d, 'yyyy-MM-dd')] = { revenue: 0, orders: 0 };
+        });
+        (currentOrders || []).forEach((o: any) => {
+          const day = format(new Date(o.created_at), 'yyyy-MM-dd');
+          if (dailyMap[day]) {
+            dailyMap[day].revenue += Number(o.total_amount || 0);
+            dailyMap[day].orders += 1;
+          }
+        });
+
+        const revData = allDays.map(d => {
+          const key = format(d, 'yyyy-MM-dd');
+          return { period: format(d, 'MMM dd'), amount: dailyMap[key].revenue };
+        });
+        const ordData = allDays.map(d => {
+          const key = format(d, 'yyyy-MM-dd');
+          return { period: format(d, 'MMM dd'), count: dailyMap[key].orders };
+        });
+        setRevenueData(revData);
+        setOrdersData(ordData);
+
+        // Top products from POS sale items
+        let posQ = supabase
+          .from('pos_sale_items')
+          .select('product_id, quantity, total_price, products(name, category)')
+          .gte('created_at', start);
+        // POS sales are user-scoped
+        const { data: posItems } = await posQ;
+
+        // Also check order_items if available
+        let orderItemsData: any[] = [];
+        try {
+          let oiQ = supabase
+            .from('order_items')
+            .select('product_id, quantity, total_price, products(name, category)')
+            .gte('created_at', start);
+          const { data: oi } = await oiQ;
+          orderItemsData = oi || [];
+        } catch {
+          // order_items table may not exist
         }
-        orderQuery = orderQuery.gte('created_at', start).lte('created_at', end).in('status', ['completed', 'paid']);
-        const { data: orders, error: ordersError } = await orderQuery;
-        if (ordersError) throw ordersError;
-        const totalRevenue = (orders || []).reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-        const totalOrders = (orders || []).length;
-        setRevenueData([{ period: `${start} - ${end}`, amount: totalRevenue }]);
-        setOrdersData([{ period: `${start} - ${end}`, count: totalOrders }]);
-        setTopProducts([]);
+
+        const allSaleItems = [...(posItems || []), ...orderItemsData];
+        const productSales: Record<string, { name: string; category: string; quantity: number; revenue: number }> = {};
+        let totalQtySold = 0;
+
+        allSaleItems.forEach((item: any) => {
+          const pid = item.product_id;
+          if (!pid) return;
+          totalQtySold += Number(item.quantity || 0);
+          if (!productSales[pid]) {
+            productSales[pid] = {
+              name: item.products?.name || 'Unknown',
+              category: item.products?.category || 'Unknown',
+              quantity: 0,
+              revenue: 0,
+            };
+          }
+          productSales[pid].quantity += Number(item.quantity || 0);
+          productSales[pid].revenue += Number(item.total_price || 0);
+        });
+
+        const sortedProducts = Object.values(productSales)
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 8)
+          .map(p => ({ name: p.name, sales: p.quantity, revenue: p.revenue }));
+
+        setTopProducts(sortedProducts);
+        setTotalProductsSold(totalQtySold);
+        setUniqueProductsSold(Object.keys(productSales).length);
+
+        // Customer metrics
+        const uniqueCustomerIds = new Set(
+          (currentOrders || []).map((o: any) => o.user_id || o.pharmacy_id).filter(Boolean)
+        );
         setCustomerMetrics({
+          totalCustomers: uniqueCustomerIds.size,
           newCustomers: 0,
           returningCustomers: 0,
-          totalCustomers: 0
         });
-        setInventoryTurnover([]);
-        const customers = await analyticsService.getCustomerAnalytics();
-        setCustomerMetrics(metrics => ({ ...metrics, totalCustomers: customers.length }));
+
+        // Inventory turnover from movements
+        const { data: movements } = await supabase
+          .from('inventory_movements')
+          .select('product_id, quantity, movement_type, products(name)')
+          .eq('user_id', user.id)
+          .gte('created_at', start);
+
+        const movementMap: Record<string, { name: string; sold: number; received: number }> = {};
+        (movements || []).forEach((m: any) => {
+          const pid = m.product_id;
+          if (!movementMap[pid]) {
+            movementMap[pid] = { name: m.products?.name || 'Unknown', sold: 0, received: 0 };
+          }
+          if (m.movement_type === 'sale' || m.movement_type === 'out') {
+            movementMap[pid].sold += Math.abs(Number(m.quantity || 0));
+          } else {
+            movementMap[pid].received += Math.abs(Number(m.quantity || 0));
+          }
+        });
+
+        const turnoverData = Object.values(movementMap)
+          .map(p => ({
+            product: p.name,
+            turnoverRate: p.received > 0 ? parseFloat((p.sold / p.received).toFixed(2)) : p.sold,
+            daysInStock: p.sold > 0 ? Math.round(days / (p.sold / (p.received || 1))) : days,
+          }))
+          .sort((a, b) => b.turnoverRate - a.turnoverRate)
+          .slice(0, 10);
+        setInventoryTurnover(turnoverData);
+
       } catch (err) {
+        console.error('Analytics error:', err);
         setError('Failed to load analytics. Please try again later.');
       }
       setLoading(false);
     })();
   }, [user, timeframe]);
 
-  const revenueGrowth = revenueData.length > 1 ? (((revenueData[revenueData.length - 1].amount - revenueData[revenueData.length - 2].amount) / (revenueData[revenueData.length - 2].amount || 1)) * 100).toFixed(1) : '0';
-  const orderGrowth = ordersData.length > 1 ? (((ordersData[ordersData.length - 1].count - ordersData[ordersData.length - 2].count) / (ordersData[ordersData.length - 2].count || 1)) * 100).toFixed(1) : '0';
+  const currentRevenue = revenueData.reduce((sum, item) => sum + item.amount, 0);
+  const currentOrders = ordersData.reduce((sum, item) => sum + item.count, 0);
+  const revenueGrowth = prevPeriodRevenue > 0 ? (((currentRevenue - prevPeriodRevenue) / prevPeriodRevenue) * 100).toFixed(1) : currentRevenue > 0 ? '100' : '0';
+  const orderGrowth = prevPeriodOrders > 0 ? (((currentOrders - prevPeriodOrders) / prevPeriodOrders) * 100).toFixed(1) : currentOrders > 0 ? '100' : '0';
 
-  // Custom tooltip component for dark mode support
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -113,7 +228,7 @@ export const AnalyticsDashboard = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
                 <p className="text-2xl font-bold text-foreground mt-1">
-                  TZS {revenueData.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}
+                  TZS {currentRevenue.toLocaleString()}
                 </p>
                 <div className="flex items-center mt-2">
                   {parseFloat(revenueGrowth) >= 0 ? (
@@ -127,6 +242,7 @@ export const AnalyticsDashboard = () => {
                       {revenueGrowth}%
                     </span>
                   )}
+                  <span className="text-xs text-muted-foreground ml-2">vs prev period</span>
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-primary/10">
@@ -141,9 +257,7 @@ export const AnalyticsDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold text-foreground mt-1">
-                  {ordersData.reduce((sum, item) => sum + item.count, 0)}
-                </p>
+                <p className="text-2xl font-bold text-foreground mt-1">{currentOrders}</p>
                 <div className="flex items-center mt-2">
                   {parseFloat(orderGrowth) >= 0 ? (
                     <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400">
@@ -156,6 +270,7 @@ export const AnalyticsDashboard = () => {
                       {orderGrowth}%
                     </span>
                   )}
+                  <span className="text-xs text-muted-foreground ml-2">vs prev period</span>
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-blue-500/10">
@@ -172,7 +287,7 @@ export const AnalyticsDashboard = () => {
                 <p className="text-sm font-medium text-muted-foreground">Active Customers</p>
                 <p className="text-2xl font-bold text-foreground mt-1">{customerMetrics.totalCustomers}</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {customerMetrics.newCustomers} new this period
+                  Unique buyers this period
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-emerald-500/10">
@@ -187,9 +302,9 @@ export const AnalyticsDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Products Sold</p>
-                <p className="text-2xl font-bold text-foreground mt-1">0</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{totalProductsSold}</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  0 unique products
+                  {uniqueProductsSold} unique products
                 </p>
               </div>
               <div className="p-3 rounded-xl bg-amber-500/10">
@@ -264,7 +379,7 @@ export const AnalyticsDashboard = () => {
                   <BarChart data={ordersData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="count" name="Orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -290,7 +405,7 @@ export const AnalyticsDashboard = () => {
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={topProducts.slice(0, 8)}>
+                  <BarChart data={topProducts}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} stroke="hsl(var(--muted-foreground))" fontSize={12} />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />

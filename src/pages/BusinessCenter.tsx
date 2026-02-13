@@ -53,8 +53,19 @@ const BusinessCenter = () => {
       const ordersThisMonth = ordersData?.length || 0;
       const activeCustomers = new Set(ordersData?.map(o => o.user_id)).size;
 
-      // Simulate growth rate (in real app, compare with previous month)
-      const growthRate = Math.random() * 30; // Random for demo
+      // Calculate real growth rate by comparing with previous month
+      const prevMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      const prevMonthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0);
+      
+      const { data: prevOrdersData } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('user_id', user?.id)
+        .gte('created_at', prevMonth.toISOString())
+        .lte('created_at', prevMonthEnd.toISOString());
+
+      const prevRevenue = prevOrdersData?.reduce((sum, order) => sum + Number(order.total_amount || 0), 0) || 0;
+      const growthRate = prevRevenue > 0 ? ((monthlyRevenue - prevRevenue) / prevRevenue) * 100 : (monthlyRevenue > 0 ? 100 : 0);
 
       setBusinessMetrics({
         monthlyRevenue,
