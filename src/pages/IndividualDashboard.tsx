@@ -183,7 +183,7 @@ const IndividualDashboard = () => {
         description="What would you like to do?"
         icon={<Search className="h-4 w-4" />}
       >
-        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <QuickActionCard
             title="Browse Medicines"
             description="Search our catalog"
@@ -211,6 +211,20 @@ const IndividualDashboard = () => {
             icon={<Heart className="h-5 w-5" />}
             href="/prep-pep"
             variant="warning"
+          />
+          <QuickActionCard
+            title="HIV Self-Test Kits"
+            description="Order discreetly"
+            icon={<Package className="h-5 w-5" />}
+            href="/prep-pep"
+            variant="warning"
+          />
+          <QuickActionCard
+            title="Circumcision"
+            description="Book safely"
+            icon={<Star className="h-5 w-5" />}
+            href="/prep-pep"
+            variant="info"
           />
           <QuickActionCard
             title="Prescriptions"
