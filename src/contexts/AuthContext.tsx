@@ -153,6 +153,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (linkedStaff) {
+        // Ensure profile role matches employer's role (fix mismatches)
+        await ensureStaffProfileRole(userId, linkedStaff.pharmacy_id);
         return {
           staffId: linkedStaff.id,
           employerId: linkedStaff.pharmacy_id,
@@ -193,6 +195,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         console.log('Staff invitation linked successfully:', staffInvitation);
+
+        // Update profile role to match employer's role so dashboard routing works
+        await ensureStaffProfileRole(userId, staffInvitation.pharmacy_id);
+
         return {
           staffId: staffInvitation.id,
           employerId: staffInvitation.pharmacy_id,
@@ -207,6 +213,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error in checkAndLinkStaffInvitation:', error);
       return null;
+    }
+  };
+
+  // Ensure staff user's profile role matches their employer's role
+  const ensureStaffProfileRole = async (userId: string, employerId: string) => {
+    try {
+      const { data: employerProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', employerId)
+        .single();
+
+      if (employerProfile) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ role: employerProfile.role, is_approved: true })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('Error updating staff profile role:', error);
+        } else {
+          console.log('Staff profile role updated to:', employerProfile.role);
+        }
+      }
+    } catch (error) {
+      console.error('Error in ensureStaffProfileRole:', error);
     }
   };
 
@@ -261,9 +293,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           // Fetch user profile when authenticated
           setTimeout(async () => {
-            const profile = await fetchUserProfile(session.user.id);
+            let profile = await fetchUserProfile(session.user.id);
             if (profile) {
-              // Check and link any pending staff invitation
+              // Check and link any pending staff invitation (also fixes profile role)
               const staffInfo = await checkAndLinkStaffInvitation(
                 session.user.id, 
                 session.user.email || profile.email
@@ -271,6 +303,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               
               if (staffInfo) {
                 console.log('User linked to employer:', staffInfo.employerId);
+                // Re-fetch profile since role may have been updated
+                profile = await fetchUserProfile(session.user.id) || profile;
               }
 
               // Initialize complimentary subscription if none exists
@@ -302,13 +336,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        fetchUserProfile(session.user.id).then(async profile => {
+        fetchUserProfile(session.user.id).then(async profileData => {
+          let profile = profileData;
           if (profile) {
-            // Check and link any pending staff invitation
+            // Check and link any pending staff invitation (also fixes profile role)
             const staffInfo = await checkAndLinkStaffInvitation(
               session.user.id, 
               session.user.email || profile.email
             );
+
+            if (staffInfo) {
+              // Re-fetch profile since role may have been updated
+              profile = await fetchUserProfile(session.user.id) || profile;
+            }
 
             // Initialize complimentary subscription if none exists
             if (!profile.subscription_status) {
