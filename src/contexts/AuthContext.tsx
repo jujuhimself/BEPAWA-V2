@@ -5,6 +5,15 @@ import { auditService } from '@/services/auditService';
 import { UserSubscription, SubscriptionPlan, SUBSCRIPTION_PLANS } from '@/types/subscription';
 import { emailService } from '@/services/emailService';
 
+export interface StaffInfo {
+  staffId: string;
+  employerId: string; // pharmacy_id from staff_members
+  staffRole: string; // pos-only, manager, admin, etc.
+  permissions: Record<string, boolean>;
+  branchId?: string | null;
+  isActive: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -34,6 +43,10 @@ export interface User {
   labLicense?: string;
   specializations?: string[];
   operatingHours?: string;
+
+  // Staff fields
+  isStaff?: boolean;
+  staffInfo?: StaffInfo;
 }
 
 interface AuthContextType {
@@ -81,9 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Convert Supabase profile to our User type
-  const convertProfileToUser = (profile: any, supabaseUser: SupabaseUser): User => {
+  const convertProfileToUser = (profile: any, supabaseUser: SupabaseUser, staffInfo?: StaffInfo | null): User => {
     return {
-      id: profile.id,
+      id: staffInfo ? staffInfo.employerId : profile.id, // Staff users operate as their employer
       email: profile.email,
       name: profile.name,
       role: profile.role,
@@ -102,6 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       labLicense: profile.lab_license,
       specializations: profile.specializations,
       operatingHours: profile.operating_hours,
+      isStaff: !!staffInfo,
+      staffInfo: staffInfo || undefined,
     };
   };
 
@@ -126,9 +141,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check and link staff invitation on registration/login
-  const checkAndLinkStaffInvitation = async (userId: string, email: string) => {
+  // Check and link staff invitation on registration/login, returns StaffInfo
+  const checkAndLinkStaffInvitation = async (userId: string, email: string): Promise<StaffInfo | null> => {
     try {
+      // First check if already linked
+      const { data: linkedStaff, error: linkedError } = await supabase
+        .from('staff_members')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (linkedStaff) {
+        return {
+          staffId: linkedStaff.id,
+          employerId: linkedStaff.pharmacy_id,
+          staffRole: linkedStaff.role,
+          permissions: (linkedStaff.permissions as Record<string, boolean>) || {},
+          branchId: linkedStaff.branch_id,
+          isActive: linkedStaff.is_active,
+        };
+      }
+
       // Find any pending staff invitation for this email
       const { data: staffInvitation, error } = await supabase
         .from('staff_members')
@@ -159,7 +193,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         console.log('Staff invitation linked successfully:', staffInvitation);
-        return staffInvitation;
+        return {
+          staffId: staffInvitation.id,
+          employerId: staffInvitation.pharmacy_id,
+          staffRole: staffInvitation.role,
+          permissions: (staffInvitation.permissions as Record<string, boolean>) || {},
+          branchId: staffInvitation.branch_id,
+          isActive: true,
+        };
       }
 
       return null;
@@ -223,27 +264,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const profile = await fetchUserProfile(session.user.id);
             if (profile) {
               // Check and link any pending staff invitation
-              const staffInvitation = await checkAndLinkStaffInvitation(
+              const staffInfo = await checkAndLinkStaffInvitation(
                 session.user.id, 
                 session.user.email || profile.email
               );
               
-              if (staffInvitation) {
-                console.log('User linked to pharmacy:', staffInvitation.pharmacy_id);
+              if (staffInfo) {
+                console.log('User linked to employer:', staffInfo.employerId);
               }
 
               // Initialize complimentary subscription if none exists
               if (!profile.subscription_status) {
                 await initializeComplimentarySubscription(session.user.id);
-                // Fetch updated profile
                 const updatedProfile = await fetchUserProfile(session.user.id);
                 if (updatedProfile) {
-                  const userData = convertProfileToUser(updatedProfile, session.user);
+                  const userData = convertProfileToUser(updatedProfile, session.user, staffInfo);
                   setUser(userData);
                   setUserSubscription(createUserSubscription(updatedProfile));
                 }
               } else {
-                const userData = convertProfileToUser(profile, session.user);
+                const userData = convertProfileToUser(profile, session.user, staffInfo);
                 setUser(userData);
                 setUserSubscription(createUserSubscription(profile));
               }
@@ -265,7 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fetchUserProfile(session.user.id).then(async profile => {
           if (profile) {
             // Check and link any pending staff invitation
-            await checkAndLinkStaffInvitation(
+            const staffInfo = await checkAndLinkStaffInvitation(
               session.user.id, 
               session.user.email || profile.email
             );
@@ -275,12 +315,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await initializeComplimentarySubscription(session.user.id);
               const updatedProfile = await fetchUserProfile(session.user.id);
               if (updatedProfile) {
-                const userData = convertProfileToUser(updatedProfile, session.user);
+                const userData = convertProfileToUser(updatedProfile, session.user, staffInfo);
                 setUser(userData);
                 setUserSubscription(createUserSubscription(updatedProfile));
               }
             } else {
-              const userData = convertProfileToUser(profile, session.user);
+              const userData = convertProfileToUser(profile, session.user, staffInfo);
               setUser(userData);
               setUserSubscription(createUserSubscription(profile));
             }
@@ -313,7 +353,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         const profile = await fetchUserProfile(data.user.id);
         if (profile) {
-          const userData = convertProfileToUser(profile, data.user);
+          // Check staff status
+          const staffInfo = await checkAndLinkStaffInvitation(data.user.id, email);
+          const userData = convertProfileToUser(profile, data.user, staffInfo);
           setUser(userData);
           setSession(data.session);
 

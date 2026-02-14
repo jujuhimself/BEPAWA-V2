@@ -3145,6 +3145,7 @@ export type Database = {
           pharmacy_id: string
           role: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           branch_id?: string | null
@@ -3158,6 +3159,7 @@ export type Database = {
           pharmacy_id: string
           role: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           branch_id?: string | null
@@ -3171,6 +3173,7 @@ export type Database = {
           pharmacy_id?: string
           role?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {

@@ -184,9 +184,9 @@ const Register = () => {
       (userData as any).vehicleType = formData.vehicleType;
       (userData as any).vehicleRegistration = formData.vehicleRegistration;
     } else if (formData.role === 'staff') {
-      // Staff members register as individual role initially
-      // The system will link them to their employer via email matching
-      userData.role = 'individual' as any; // Staff are stored as individual but linked via staff_members table
+      // Staff role: the DB trigger will detect the invitation and assign the employer's role
+      // We pass 'staff' as a hint, but the trigger overrides it with the employer's actual role
+      userData.role = 'staff' as any;
     }
 
     const result = await register(userData);
@@ -196,6 +196,8 @@ const Register = () => {
         title: "Registration successful! 🎉",
         description: formData.role === 'individual' 
           ? "Welcome to BEPAWA! You can now sign in to your account."
+          : formData.role === 'staff'
+          ? "Your staff account has been created! Log in to access your employer's dashboard with your assigned permissions."
           : "Your account has been created and is pending admin approval. You'll be notified once approved.",
       });
       navigate('/login');
