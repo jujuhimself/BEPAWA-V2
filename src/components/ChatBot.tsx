@@ -281,8 +281,8 @@ ${faqs.map(f => `• ${f.q}\n  ${f.a}`).join('\n')}`)
     id: Date.now().toString(),
     type: 'bot',
     content: lang === 'sw'
-      ? 'Nashauri uunganishwe na mshauri wa kitaalamu kwa msaada zaidi. Unaweza kuzungumza kupitia WhatsApp au kuweka miadi ya siri (chat/video).\n\n• WhatsApp: https://wa.me/255713434625\n• Book session: /appointments'
-      : 'I recommend connecting with a licensed counselor for more support. You can use WhatsApp or book a confidential session (chat/video).\n\n• WhatsApp: https://wa.me/255713434625\n• Book session: /appointments',
+      ? 'Nashauri uunganishwe na mshauri wa kitaalamu kwa msaada zaidi. Unaweza kuzungumza kupitia WhatsApp au kuweka miadi ya siri (chat/video).\n\n• WhatsApp: https://wa.me/255744969325\n• Book session: /appointments'
+      : 'I recommend connecting with a licensed counselor for more support. You can use WhatsApp or book a confidential session (chat/video).\n\n• WhatsApp: https://wa.me/255744969325\n• Book session: /appointments',
     timestamp: new Date(),
     suggestions: ['Start 2-minute timer', 'Grounding exercise'],
     category: 'general'

@@ -125,7 +125,7 @@ const IndividualDashboard = () => {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="gap-2">
-                  <a href="https://wa.me/255713434625" target="_blank" rel="noreferrer">
+                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">
                     <MessageCircle className="h-4 w-4" />
                     WhatsApp
                   </a>

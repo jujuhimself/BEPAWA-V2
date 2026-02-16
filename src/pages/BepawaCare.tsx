@@ -23,7 +23,7 @@ const BepawaCare = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-                <a href="https://wa.me/255713434625" target="_blank" rel="noreferrer">
+                <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">
                   Chat on WhatsApp
                 </a>
               </Button>
@@ -137,7 +137,7 @@ const BepawaCare = () => {
               <div className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" /> Specialized therapy: trauma recovery, HIV stigma & disclosure, family/relationship, addiction</div>
               <div className="pt-2">
                 <Button variant="outline" asChild className="w-full">
-                  <a href="https://wa.me/255713434625" target="_blank" rel="noreferrer">Talk to a counselor</a>
+                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Talk to a counselor</a>
                 </Button>
               </div>
             </CardContent>
@@ -212,7 +212,7 @@ const BepawaCare = () => {
                   <Link to="/appointments">Book Session</Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <a href="https://wa.me/255713434625" target="_blank" rel="noreferrer">WhatsApp</a>
+                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">WhatsApp</a>
                 </Button>
               </div>
             </div>
@@ -302,7 +302,7 @@ const BepawaCare = () => {
           <h4 className="text-2xl font-bold text-gray-900 mb-3">Start your journey today – your mental health is your right.</h4>
           <div className="flex flex-col sm:flex-row justify-center gap-3">
             <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-              <a href="https://wa.me/255713434625" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
+              <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
               <Link to="/appointments">Book a Counselor</Link>
@@ -352,7 +352,7 @@ const BepawaCare = () => {
             <div>
               <h4 className="font-semibold mb-4 text-lg">Support</h4>
               <ul className="space-y-3 text-gray-400">
-                <li><a href="https://wa.me/255713434625" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Healthcare Support (WhatsApp)</a></li>
+                <li><a href="https://wa.me/255744969325" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Healthcare Support (WhatsApp)</a></li>
                 <li><Link to="/settings" className="hover:text-white transition-colors">Technical Help</Link></li>
                 <li><a href="#" className="hover:text-white transition-colors">Training Resources</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
