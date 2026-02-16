@@ -240,7 +240,7 @@ const Index = () => {
                   <Link to="/bepawa-care">Explore Bepawa Care</Link>
                 </Button>
                 <Button asChild variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
-                  <a href="https://wa.me/255713434625" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
+                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
                 </Button>
               </div>
             </div>
