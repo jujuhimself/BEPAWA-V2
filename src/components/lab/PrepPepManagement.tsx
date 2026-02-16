@@ -150,7 +150,7 @@ const PrepPepManagement = () => {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{booking.patient_name}</span>
                         {getStatusBadge(booking.status)}
-                        <Badge variant="outline">{booking.service_type.toUpperCase()}</Badge>
+                        <Badge variant="outline">{booking.service_type?.toUpperCase() || 'N/A'}</Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {format(new Date(booking.booking_date), 'PPP')} {booking.booking_time && `at ${booking.booking_time}`}

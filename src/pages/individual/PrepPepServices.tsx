@@ -85,7 +85,8 @@ const PrepPepServices = () => {
     labMap.get(key)!.services.push(s);
   });
 
-  const getServiceLabel = (type: string) => {
+  const getServiceLabel = (type?: string) => {
+    if (!type) return 'Service';
     switch (type) {
       case 'prep': return 'PrEP';
       case 'pep': return 'PEP';
