@@ -54,7 +54,7 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
       setIsLoading(true);
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, business_name, region, city, phone, address, is_approved')
+        .select('id, name, business_name, pharmacy_name, region, city, phone, address, is_approved, operating_hours')
         .eq('role', 'retail')
         .eq('is_approved', true)
         .order('business_name');
@@ -84,12 +84,12 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
 
       const pharmacyData: Pharmacy[] = (data || []).map((pharmacy: any) => ({
         id: pharmacy.id,
-        name: pharmacy.business_name || pharmacy.name || 'Pharmacy',
+        name: pharmacy.pharmacy_name || pharmacy.business_name || pharmacy.name || 'Pharmacy',
         location: pharmacy.address || ((pharmacy.city && pharmacy.region) ? `${pharmacy.city}, ${pharmacy.region}` : 'Location not set'),
         rating: 4.5, // Default rating
         distance: 'N/A', // Would need location services for real distance
         isOpen: true, // Default to open
-        hours: '8:00 AM - 8:00 PM', // Default hours
+        hours: pharmacy.operating_hours || '8:00 AM - 8:00 PM',
         phone: pharmacy.phone || 'N/A',
         stock: allStock[pharmacy.id] || []
       }));

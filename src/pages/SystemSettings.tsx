@@ -95,8 +95,22 @@ const SystemSettings = () => {
   const handleSaveSettings = async () => {
     setIsLoading(true);
     try {
-      // Here you would call the settings service to save settings
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated API call
+      // Save operating hours and address to profile
+      const updates: Record<string, any> = {};
+      if ((settings as any).operatingHours !== undefined) {
+        updates.operating_hours = (settings as any).operatingHours;
+      }
+      if ((settings as any).address !== undefined) {
+        updates.address = (settings as any).address;
+      }
+      
+      if (Object.keys(updates).length > 0 && user) {
+        const { error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+        if (error) throw error;
+      }
       
       toast({
         title: "Settings saved",
@@ -372,6 +386,36 @@ const SystemSettings = () => {
                 <CardTitle>Business Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Operating Hours */}
+                <div className="space-y-2">
+                  <Label htmlFor="operating-hours">Operating Hours</Label>
+                  <Input
+                    id="operating-hours"
+                    placeholder="8:00 AM - 9:00 PM"
+                    value={(settings as any).operatingHours || user?.operatingHours || ''}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      operatingHours: e.target.value
+                    } as any)}
+                  />
+                  <p className="text-sm text-muted-foreground">Displayed on your public pharmacy/business profile</p>
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2">
+                  <Label htmlFor="business-address">Business Address</Label>
+                  <Input
+                    id="business-address"
+                    placeholder="Enter your business address"
+                    value={(settings as any).address || user?.address || ''}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      address: e.target.value
+                    } as any)}
+                  />
+                  <p className="text-sm text-muted-foreground">Used for delivery distance calculations and shown to customers</p>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="tax-rate">Default Tax Rate (%)</Label>

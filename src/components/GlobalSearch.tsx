@@ -52,56 +52,27 @@ export const GlobalSearch = () => {
   }, [query]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       const products = await inventoryService.getProducts();
-      setInventory(products);
+      if (!cancelled) setInventory(products);
     })();
+    return () => { cancelled = true; };
   }, []);
 
   const performSearch = async (searchQuery: string) => {
     const searchResults: SearchResult[] = [];
     const lowercaseQuery = searchQuery.toLowerCase();
 
-    // Search orders
-    const orders = await dataService.getOrders();
-    orders.forEach(order => {
-      if (order.id.toLowerCase().includes(lowercaseQuery) || 
-          order.order_number?.toLowerCase().includes(lowercaseQuery)) {
-        searchResults.push({
-          id: order.id,
-          title: `Order #${order.order_number || order.id}`,
-          subtitle: `Order ${order.order_type} - ${order.payment_status}`,
-          type: 'order',
-          route: '/orders',
-          icon: <FileText className="h-4 w-4" />
-        });
-      }
-    });
-
-    // Search prescriptions
-    const prescriptions = dataService.getPrescriptions();
-    prescriptions.forEach(prescription => {
-      if (prescription.patientName?.toLowerCase().includes(lowercaseQuery) ||
-          prescription.id.toLowerCase().includes(lowercaseQuery)) {
-        searchResults.push({
-          id: prescription.id,
-          title: `Prescription #${prescription.id}`,
-          subtitle: `Patient: ${prescription.patientName}`,
-          type: 'prescription',
-          route: '/prescription-management',
-          icon: <FileText className="h-4 w-4" />
-        });
-      }
-    });
-
-    // Search inventory
+    // Search inventory first (fastest, local data)
     inventory.forEach(item => {
       if (item.name?.toLowerCase().includes(lowercaseQuery) ||
-          item.category?.toLowerCase().includes(lowercaseQuery)) {
+          item.category?.toLowerCase().includes(lowercaseQuery) ||
+          item.sku?.toLowerCase().includes(lowercaseQuery)) {
         searchResults.push({
           id: item.id,
           title: item.name,
-          subtitle: `${item.category} - Stock: ${item.stock}`,
+          subtitle: `${item.category} - Stock: ${item.stock}${item.sku ? ` - SKU: ${item.sku}` : ''}`,
           type: 'product',
           route: '/inventory-management',
           icon: <Package className="h-4 w-4" />
@@ -109,7 +80,43 @@ export const GlobalSearch = () => {
       }
     });
 
-    setResults(searchResults.slice(0, 10)); // Limit to 10 results
+    // Search orders
+    try {
+      const orders = await dataService.getOrders();
+      orders.forEach(order => {
+        if (order.id.toLowerCase().includes(lowercaseQuery) || 
+            order.order_number?.toLowerCase().includes(lowercaseQuery)) {
+          searchResults.push({
+            id: order.id,
+            title: `Order #${order.order_number || order.id.slice(0, 8)}`,
+            subtitle: `${order.order_type} - ${order.payment_status}`,
+            type: 'order',
+            route: '/orders',
+            icon: <FileText className="h-4 w-4" />
+          });
+        }
+      });
+    } catch (e) { /* ignore */ }
+
+    // Search prescriptions
+    try {
+      const prescriptions = dataService.getPrescriptions();
+      prescriptions.forEach(prescription => {
+        if (prescription.patientName?.toLowerCase().includes(lowercaseQuery) ||
+            prescription.id.toLowerCase().includes(lowercaseQuery)) {
+          searchResults.push({
+            id: prescription.id,
+            title: `Prescription #${prescription.id.slice(0, 8)}`,
+            subtitle: `Patient: ${prescription.patientName}`,
+            type: 'prescription',
+            route: '/prescription-management',
+            icon: <FileText className="h-4 w-4" />
+          });
+        }
+      });
+    } catch (e) { /* ignore */ }
+
+    setResults(searchResults.slice(0, 15));
   };
 
   const handleResultClick = (result: SearchResult) => {

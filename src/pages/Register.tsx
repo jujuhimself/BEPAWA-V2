@@ -171,10 +171,12 @@ const Register = () => {
       userData.pharmacyName = formData.pharmacyName;
       userData.licenseNumber = formData.licenseNumber;
       userData.pharmacistName = formData.pharmacistName;
+      if (formData.operatingHours) userData.operatingHours = formData.operatingHours;
     } else if (formData.role === 'wholesale') {
       userData.businessName = formData.businessName;
       userData.businessLicense = formData.businessLicense;
       userData.taxId = formData.taxId;
+      if (formData.operatingHours) userData.operatingHours = formData.operatingHours;
     } else if (formData.role === 'lab') {
       userData.labName = formData.labName;
       userData.labLicense = formData.labLicense;
@@ -370,7 +372,7 @@ const Register = () => {
               </div>
             )}
 
-            {formData.role === 'retail' && (
+             {formData.role === 'retail' && (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="pharmacyName">Pharmacy Name *</Label>
@@ -403,6 +405,15 @@ const Register = () => {
                       required
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="operatingHours">Operating Hours</Label>
+                  <Input
+                    id="operatingHours"
+                    placeholder="8:00 AM - 9:00 PM"
+                    value={formData.operatingHours}
+                    onChange={(e) => handleInputChange('operatingHours', e.target.value)}
+                  />
                 </div>
               </div>
             )}
@@ -440,6 +451,15 @@ const Register = () => {
                       required
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="operatingHours">Operating Hours</Label>
+                  <Input
+                    id="operatingHours"
+                    placeholder="8:00 AM - 6:00 PM"
+                    value={formData.operatingHours}
+                    onChange={(e) => handleInputChange('operatingHours', e.target.value)}
+                  />
                 </div>
               </div>
             )}
