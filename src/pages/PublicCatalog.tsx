@@ -52,13 +52,14 @@ const PublicCatalog = () => {
           .eq('is_retail_product', true)
           .neq('is_wholesale_product', true));
       } else if (user.role === 'retail') {
-        // Retailers: only show public products
-        ({ data: productsData, error } = await productsQuery.eq('is_public_product', true));
+        // Retailers: show ONLY wholesale products (not their own products)
+        ({ data: productsData, error } = await productsQuery
+          .eq('is_wholesale_product', true)
+          .neq('user_id', user.id));
       } else if (user.role === 'wholesale') {
         // Wholesalers: only their own products
         ({ data: productsData, error } = await productsQuery.eq('user_id', user.id));
       } else {
-        // Fallback: show nothing
         productsData = [];
         error = null;
       }
@@ -442,8 +443,12 @@ const PublicCatalog = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Public Catalog</h1>
-          <p className="text-gray-600 text-lg">Explore products from retail pharmacies near you</p>
+         <h1 className="text-4xl font-bold text-foreground mb-2">
+           {user?.role === 'retail' ? 'Wholesale Products' : 'Public Catalog'}
+         </h1>
+         <p className="text-muted-foreground text-lg">
+           {user?.role === 'retail' ? 'Browse and order products from wholesale distributors' : 'Explore products from retail pharmacies near you'}
+         </p>
         </div>
 
         <div className="grid lg:grid-cols-4 gap-8">
@@ -491,9 +496,11 @@ const PublicCatalog = () => {
                             <p className="text-sm text-gray-500">by {product.manufacturer}</p>
                           )}
                           {(product as any).wholesaler_name && (
-                            <p className="text-sm text-blue-700">from {(product as any).wholesaler_name}</p>
+                            <p className="text-sm text-primary">from {(product as any).wholesaler_name}</p>
                           )}
-                          <p className="text-sm text-blue-600">from {product.pharmacy_name}</p>
+                          {!(product as any).wholesaler_name && product.pharmacy_name && (
+                            <p className="text-sm text-muted-foreground">{product.pharmacy_name}</p>
+                          )}
                           <div className="flex gap-1 mt-2">
                             {product.is_retail_product && <Badge variant="outline" className="text-xs">Retail</Badge>}
                             {product.is_public_product && <Badge variant="default" className="text-xs">Public</Badge>}

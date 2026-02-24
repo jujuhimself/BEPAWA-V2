@@ -263,7 +263,7 @@ const PersonalHealth = () => {
                     {hivPharmacies.map(pharmacy => (
                       <Card key={pharmacy.id} className="border shadow-md">
                         <CardHeader>
-                          <CardTitle className="text-lg">{pharmacy.business_name || pharmacy.name}</CardTitle>
+                          <CardTitle className="text-lg">{pharmacy.pharmacy_name || pharmacy.business_name || pharmacy.name}</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="text-muted-foreground mb-2">{pharmacy.address}</div>

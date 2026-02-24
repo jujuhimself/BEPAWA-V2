@@ -41,7 +41,7 @@ const ResponsiveNavigation = () => {
     return roleMap[role as keyof typeof roleMap] || role;
   };
 
-  const navigationConfig = new NavigationMenuConfig(user?.role || 'individual');
+  const navigationConfig = new NavigationMenuConfig(user?.role || 'individual', user?.staffInfo?.permissions);
   const menuGroups = navigationConfig.getMenuGroups();
 
   // Deduplicate groups by name
@@ -49,8 +49,8 @@ const ResponsiveNavigation = () => {
     arr.findIndex(g => g.name === group.name) === idx
   );
 
-  // DEBUG: Log the group structure
-  console.log('NAV GROUPS', uniqueMenuGroups);
+  // Remove debug log
+  
 
   return (
     <nav className="bg-background border-b border-border sticky top-0 z-50">

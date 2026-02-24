@@ -36,9 +36,11 @@ export interface NavigationGroup {
 
 export class NavigationMenuConfig {
   private role: string;
+  private staffPermissions?: Record<string, boolean>;
 
-  constructor(role: string) {
+  constructor(role: string, staffPermissions?: Record<string, boolean>) {
     this.role = role;
+    this.staffPermissions = staffPermissions;
   }
 
   private getNavigationItems(): Record<string, NavigationItem[]> {
@@ -178,7 +180,33 @@ export class NavigationMenuConfig {
 
   getMenuGroups(): NavigationGroup[] {
     const allItems = this.getNavigationItems();
-    const roleItems = allItems[this.role] || allItems['retail'];
+    let roleItems = allItems[this.role] || allItems['retail'];
+    
+    // If staff with permissions, filter navigation items to only allowed sections
+    if (this.staffPermissions) {
+      const permissionToLabels: Record<string, string[]> = {
+        pos: ['POS'],
+        inventory: ['Inventory', 'Inventory Dashboard', 'Browse Products'],
+        orders: ['Orders', 'Wholesale Orders', 'Cart', 'Retailer Orders', 'Purchase Orders', 'My Orders'],
+        business_tools: ['Business Center', 'Business Operations Hub'],
+        analytics: ['Analytics'],
+        credit_crm: ['Credit Request', 'Credit Management', 'Retailers'],
+        audit: ['Audit Logs'],
+        alerts: ['Alerts'],
+      };
+      
+      // Always allow Dashboard and Settings
+      const allowedLabels = new Set(['Dashboard', 'Settings', 'Subscription']);
+      
+      Object.entries(this.staffPermissions).forEach(([perm, enabled]) => {
+        if (enabled && permissionToLabels[perm]) {
+          permissionToLabels[perm].forEach(label => allowedLabels.add(label));
+        }
+      });
+      
+      roleItems = roleItems.filter(item => allowedLabels.has(item.label));
+    }
+    
     return this.groupItemsByCategory(roleItems);
   }
 

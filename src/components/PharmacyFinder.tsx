@@ -22,6 +22,7 @@ interface Pharmacy {
 
 const PharmacyFinder = () => {
   const [searchLocation, setSearchLocation] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -41,15 +42,15 @@ const PharmacyFinder = () => {
 
         if (error) throw error;
 
-        // Map to Pharmacy interface
+        // Map to Pharmacy interface - prioritize pharmacy_name over personal name
         const mappedPharmacies: Pharmacy[] = (data || []).map((profile: any) => ({
           id: profile.id,
-          name: profile.pharmacy_name || profile.business_name || profile.name || 'Pharmacy',
+          name: profile.pharmacy_name || profile.business_name || 'Pharmacy',
           address: profile.address || `${profile.city || ''}, ${profile.region || 'Tanzania'}`.trim().replace(/^,\s*/, ''),
           phone: profile.phone || 'N/A',
-          rating: 4.5 + Math.random() * 0.5, // Placeholder rating
-          distance: `${(Math.random() * 5).toFixed(1)} km`, // Placeholder distance
-          isOpen: true, // Default to open
+          rating: 4.5 + Math.random() * 0.5,
+          distance: `${(Math.random() * 5).toFixed(1)} km`,
+          isOpen: true,
           operatingHours: profile.operating_hours || "8:00 AM - 9:00 PM",
           services: ["Prescription", "OTC Medicines", "Delivery"]
         }));
@@ -139,22 +140,29 @@ const PharmacyFinder = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Location Search */}
-        <div className="flex gap-2">
+        {/* Search Pharmacies */}
+        <div className="space-y-2">
           <Input
-            placeholder="Enter your location or area"
-            value={searchLocation}
-            onChange={(e) => setSearchLocation(e.target.value)}
-            className="flex-1"
+            placeholder="Search pharmacies by name, address, or services..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <Button 
-            variant="outline" 
-            onClick={handleGetCurrentLocation}
-            className="shrink-0"
-          >
-            <Navigation className="h-4 w-4 mr-2" />
-            Use Current
-          </Button>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter your location or area"
+              value={searchLocation}
+              onChange={(e) => setSearchLocation(e.target.value)}
+              className="flex-1"
+            />
+            <Button 
+              variant="outline" 
+              onClick={handleGetCurrentLocation}
+              className="shrink-0"
+            >
+              <Navigation className="h-4 w-4 mr-2" />
+              Use Current
+            </Button>
+          </div>
         </div>
 
         {/* Empty State */}
@@ -168,7 +176,13 @@ const PharmacyFinder = () => {
 
         {/* Pharmacy List */}
         <div className="space-y-4">
-          {pharmacies.map((pharmacy) => (
+          {pharmacies
+            .filter(p => {
+              if (!searchQuery) return true;
+              const q = searchQuery.toLowerCase();
+              return p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q) || p.services.some(s => s.toLowerCase().includes(q));
+            })
+            .map((pharmacy) => (
             <Card key={pharmacy.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
