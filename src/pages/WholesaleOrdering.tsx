@@ -6,11 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Plus, Minus, Package, Clock, CheckCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ShoppingCart, Plus, Minus, Package, Clock, CheckCircle, Truck, CreditCard, MapPin, Phone, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { creditService } from '@/services/creditService';
+import { useCreateCODOrder } from '@/hooks/useDelivery';
+import LocationPicker, { LocationData } from '@/components/delivery/LocationPicker';
+import {
+  calculateDeliveryFee,
+  calculateDistance,
+  formatTZS,
+  MAX_DELIVERY_DISTANCE_KM,
+  DELIVERY_PRICE_TIERS
+} from '@/utils/deliveryPricing';
 
 interface Product {
   id: string;
@@ -21,6 +32,8 @@ interface Product {
   description: string;
   supplier: string;
   min_order_qty?: number;
+  wholesaler_id?: string;
+  user_id?: string;
 }
 
 interface Supplier {
@@ -49,13 +62,23 @@ const WholesaleOrdering = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [notes, setNotes] = useState("");
+
+  // Payment method
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'credit'>('cod');
   const [payWithCredit, setPayWithCredit] = useState(false);
   const [creditAccount, setCreditAccount] = useState<any>(null);
+
+  // COD delivery details
+  const [deliveryLocation, setDeliveryLocation] = useState<LocationData | null>(null);
+  const [deliveryPhone, setDeliveryPhone] = useState(user?.phone || '');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [deliveryDistance, setDeliveryDistance] = useState(0);
+  const [wholesalerLocation, setWholesalerLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const createCODOrder = useCreateCODOrder();
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Fetch only wholesale products from wholesaler users
         const { data: wholesalerProfiles } = await supabase
           .from('profiles')
           .select('id')
@@ -77,11 +100,7 @@ const WholesaleOrdering = () => {
 
         if (error) {
           console.error('Error fetching products:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load products",
-            variant: "destructive",
-          });
+          toast({ title: "Error", description: "Failed to load products", variant: "destructive" });
           return;
         }
 
@@ -93,17 +112,15 @@ const WholesaleOrdering = () => {
           stock: item.stock,
           description: item.description || '',
           supplier: item.supplier || '',
-          min_order_qty: item.min_stock_level || 1
+          min_order_qty: item.min_stock_level || 1,
+          wholesaler_id: item.wholesaler_id,
+          user_id: item.user_id,
         }));
 
         setProducts(transformedProducts);
       } catch (error: any) {
         console.error('Unexpected error fetching products:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load products",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Failed to load products", variant: "destructive" });
       }
     };
 
@@ -116,22 +133,12 @@ const WholesaleOrdering = () => {
 
         if (error) {
           console.error('Error fetching suppliers:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load suppliers",
-            variant: "destructive",
-          });
           return;
         }
 
         setSuppliers(data || []);
       } catch (error: any) {
         console.error('Unexpected error fetching suppliers:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load suppliers",
-          variant: "destructive",
-        });
       }
     };
 
@@ -140,6 +147,26 @@ const WholesaleOrdering = () => {
       fetchSuppliers();
     }
   }, [user, toast]);
+
+  // Fetch wholesaler location when supplier selected (for COD distance calc)
+  useEffect(() => {
+    if (!selectedSupplier) {
+      setWholesalerLocation(null);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('latitude, longitude')
+        .eq('id', selectedSupplier)
+        .single();
+      if (data?.latitude && data?.longitude) {
+        setWholesalerLocation({ latitude: data.latitude, longitude: data.longitude });
+      } else {
+        setWholesalerLocation(null);
+      }
+    })();
+  }, [selectedSupplier]);
 
   useEffect(() => {
     async function fetchCreditAccount() {
@@ -156,7 +183,7 @@ const WholesaleOrdering = () => {
 
   const addToOrder = (product: Product) => {
     const existingItem = orderItems.find(item => item.product_id === product.id);
-    
+
     if (existingItem) {
       setOrderItems(prev => prev.map(item =>
         item.product_id === product.id
@@ -173,10 +200,7 @@ const WholesaleOrdering = () => {
       }]);
     }
 
-    toast({
-      title: "Added to order",
-      description: `${product.name} added to your order`,
-    });
+    toast({ title: "Added to order", description: `${product.name} added to your order` });
   };
 
   const updateQuantity = (productId: string, newQuantity: number) => {
@@ -184,7 +208,6 @@ const WholesaleOrdering = () => {
       removeFromOrder(productId);
       return;
     }
-
     setOrderItems(prev => prev.map(item =>
       item.product_id === productId
         ? { ...item, quantity: newQuantity, total_price: newQuantity * item.unit_price }
@@ -200,13 +223,73 @@ const WholesaleOrdering = () => {
     return orderItems.reduce((sum, item) => sum + item.total_price, 0);
   };
 
-  const submitOrder = async () => {
-    if (!user || orderItems.length === 0 || !selectedSupplier) {
+  const getDeliveryFee = () => calculateDeliveryFee(deliveryDistance);
+
+  const submitCODOrder = async () => {
+    if (!user || orderItems.length === 0) return;
+
+    if (!deliveryLocation || !deliveryPhone) {
       toast({
-        title: "Error",
-        description: "Please select a supplier and add items to your order",
-        variant: "destructive",
+        title: 'Missing Information',
+        description: 'Please select a delivery location and provide phone number',
+        variant: 'destructive'
       });
+      return;
+    }
+
+    // Determine the wholesaler (pharmacy_id for delivery context)
+    const wholesalerId = selectedSupplier || orderItems[0]?.product_id
+      ? products.find(p => p.id === orderItems[0]?.product_id)?.user_id
+      : undefined;
+
+    if (!wholesalerId) {
+      toast({ title: 'Error', description: 'Unable to determine wholesaler.', variant: 'destructive' });
+      return;
+    }
+
+    const deliveryFee = getDeliveryFee();
+    const totalWithDelivery = getTotalAmount() + deliveryFee;
+
+    createCODOrder.mutate({
+      user_id: user.id,
+      items: orderItems.map(item => ({
+        id: item.product_id,
+        name: item.product_name,
+        price: item.unit_price,
+        quantity: item.quantity,
+        manufacturer: '',
+        category: 'wholesale',
+      })),
+      total_amount: totalWithDelivery,
+      delivery_address: deliveryLocation.address,
+      delivery_phone: deliveryPhone,
+      delivery_notes: deliveryNotes || notes,
+      pharmacy_id: wholesalerId,
+      delivery_fee: deliveryFee,
+      delivery_coordinates: {
+        latitude: deliveryLocation.latitude,
+        longitude: deliveryLocation.longitude
+      }
+    }, {
+      onSuccess: () => {
+        setOrderItems([]);
+        setSelectedSupplier("");
+        setNotes("");
+        setDeliveryLocation(null);
+        setDeliveryPhone('');
+        setDeliveryNotes('');
+        setDeliveryDistance(0);
+        toast({
+          title: "COD Order submitted!",
+          description: "Your order has been placed. The wholesaler will confirm and arrange delivery.",
+        });
+      }
+    });
+  };
+
+  const submitPurchaseOrder = async () => {
+    if (!user || orderItems.length === 0 || !selectedSupplier) {
+      toast({ title: "Error", description: "Please select a supplier and add items", variant: "destructive" });
       return;
     }
     if (payWithCredit) {
@@ -215,14 +298,13 @@ const WholesaleOrdering = () => {
         return;
       }
       if (creditAccount.credit_limit - creditAccount.current_balance < getTotalAmount()) {
-        toast({ title: 'Credit Limit Exceeded', description: 'Not enough available credit for this order.', variant: 'destructive' });
+        toast({ title: 'Credit Limit Exceeded', description: 'Not enough available credit.', variant: 'destructive' });
         return;
       }
     }
     setIsLoading(true);
 
     try {
-      // Create purchase order
       const orderData = {
         user_id: user.id,
         supplier_id: selectedSupplier,
@@ -241,7 +323,6 @@ const WholesaleOrdering = () => {
 
       if (orderError) throw orderError;
 
-      // Create order items
       const itemsData = orderItems.map(item => ({
         purchase_order_id: order.id,
         product_name: item.product_name,
@@ -261,25 +342,26 @@ const WholesaleOrdering = () => {
         description: `Purchase order ${order.po_number} has been submitted successfully`,
       });
 
-      // Reset form
       setOrderItems([]);
       setSelectedSupplier("");
       setNotes("");
 
-      // If payWithCredit, update credit balance
       if (payWithCredit && creditAccount) {
         await creditService.updateAccountBalance(creditAccount.id, creditAccount.current_balance + getTotalAmount());
       }
-
     } catch (error: any) {
       console.error('Error submitting order:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit order",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Failed to submit order", variant: "destructive" });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (paymentMethod === 'cod') {
+      submitCODOrder();
+    } else {
+      submitPurchaseOrder();
     }
   };
 
@@ -299,7 +381,6 @@ const WholesaleOrdering = () => {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Product Catalog */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Search and Filters */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex gap-4 mb-4">
@@ -326,7 +407,6 @@ const WholesaleOrdering = () => {
               </CardContent>
             </Card>
 
-            {/* Products Grid */}
             <div className="grid md:grid-cols-2 gap-4">
               {filteredProducts.map((product) => (
                 <Card key={product.id} className="hover:shadow-lg transition-shadow">
@@ -341,18 +421,12 @@ const WholesaleOrdering = () => {
                         Stock: {product.stock}
                       </Badge>
                     </div>
-                    
                     <p className="text-gray-700 mb-4 text-sm">{product.description}</p>
-                    
                     <div className="flex justify-between items-center">
                       <span className="text-2xl font-bold text-blue-600">
                         TZS {product.price.toLocaleString()}
                       </span>
-                      <Button
-                        onClick={() => addToOrder(product)}
-                        disabled={product.stock === 0}
-                        size="sm"
-                      >
+                      <Button onClick={() => addToOrder(product)} disabled={product.stock === 0} size="sm">
                         <Plus className="h-4 w-4 mr-2" />
                         Add to Order
                       </Button>
@@ -377,7 +451,7 @@ const WholesaleOrdering = () => {
                   <p className="text-gray-500 text-center py-8">No items in order</p>
                 ) : (
                   <>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                    <div className="space-y-3 max-h-48 overflow-y-auto">
                       {orderItems.map((item) => (
                         <div key={item.product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex-1">
@@ -385,19 +459,11 @@ const WholesaleOrdering = () => {
                             <p className="text-gray-600 text-xs">TZS {item.unit_price.toLocaleString()} each</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                            >
+                            <Button variant="outline" size="sm" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
                               <Minus className="h-3 w-3" />
                             </Button>
                             <span className="w-8 text-center text-sm">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                            >
+                            <Button variant="outline" size="sm" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}>
                               <Plus className="h-3 w-3" />
                             </Button>
                           </div>
@@ -405,53 +471,181 @@ const WholesaleOrdering = () => {
                       ))}
                     </div>
 
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between font-bold text-lg">
-                        <span>Total:</span>
+                    {/* Payment Method Tabs */}
+                    <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as 'cod' | 'credit')}>
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="cod" className="flex items-center gap-1">
+                          <Truck className="h-4 w-4" />
+                          COD
+                        </TabsTrigger>
+                        <TabsTrigger value="credit" className="flex items-center gap-1">
+                          <CreditCard className="h-4 w-4" />
+                          Credit
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {/* COD Tab */}
+                      <TabsContent value="cod" className="space-y-3 mt-3">
+                        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <p className="text-xs text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                            <Truck className="h-3.5 w-3.5 shrink-0" />
+                            Pay cash when your order is delivered
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1 text-sm">
+                            <Phone className="h-3.5 w-3.5" /> Phone *
+                          </Label>
+                          <Input
+                            value={deliveryPhone}
+                            onChange={(e) => setDeliveryPhone(e.target.value)}
+                            placeholder="+255 7XX XXX XXX"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1 text-sm">
+                            <MapPin className="h-3.5 w-3.5" /> Delivery Location *
+                          </Label>
+                          <LocationPicker
+                            onLocationSelect={(location) => {
+                              setDeliveryLocation(location);
+                              if (wholesalerLocation) {
+                                const distance = calculateDistance(
+                                  wholesalerLocation.latitude, wholesalerLocation.longitude,
+                                  location.latitude, location.longitude
+                                );
+                                setDeliveryDistance(distance);
+                              }
+                            }}
+                            pharmacyLocation={wholesalerLocation || undefined}
+                            placeholder="Search delivery location..."
+                          />
+                          {deliveryLocation && (
+                            <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary">{deliveryDistance.toFixed(1)} km</Badge>
+                                  <span className="text-xs text-muted-foreground">from wholesaler</span>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-sm text-primary">{formatTZS(getDeliveryFee())}</p>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <Info className="h-3 w-3" /> fee
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <p className="font-medium mb-1">Delivery Pricing</p>
+                                        <ul className="text-xs space-y-0.5">
+                                          {DELIVERY_PRICE_TIERS.map((tier, i) => (
+                                            <li key={i}>{tier.minKm}-{tier.maxKm} km: {formatTZS(tier.price)}</li>
+                                          ))}
+                                        </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
+                              </div>
+                              {deliveryDistance > MAX_DELIVERY_DISTANCE_KM && (
+                                <p className="text-xs text-amber-600 mt-1">⚠️ Beyond standard delivery range</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm">Delivery Notes</Label>
+                          <Textarea
+                            value={deliveryNotes}
+                            onChange={(e) => setDeliveryNotes(e.target.value)}
+                            placeholder="Special instructions for delivery..."
+                            className="h-16"
+                          />
+                        </div>
+                      </TabsContent>
+
+                      {/* Credit Tab */}
+                      <TabsContent value="credit" className="space-y-3 mt-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="payWithCredit"
+                            checked={payWithCredit}
+                            onChange={e => setPayWithCredit(e.target.checked)}
+                            disabled={!creditAccount || creditAccount.status !== 'active'}
+                          />
+                          <Label htmlFor="payWithCredit" className="cursor-pointer text-sm">
+                            Pay with Credit
+                            {creditAccount && creditAccount.status === 'active' && (
+                              <span className="ml-2 text-xs text-green-700">
+                                Available: TZS {(creditAccount.credit_limit - creditAccount.current_balance).toLocaleString()}
+                              </span>
+                            )}
+                          </Label>
+                        </div>
+                        {!creditAccount && (
+                          <p className="text-xs text-muted-foreground">
+                            No credit account with this supplier. Select a supplier first or apply for credit.
+                          </p>
+                        )}
+                        <div className="space-y-2">
+                          <Label className="text-sm">Order Notes</Label>
+                          <Textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            placeholder="Any special instructions..."
+                            className="h-16"
+                          />
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    {/* Totals */}
+                    <div className="border-t pt-3 space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span>Subtotal:</span>
                         <span>TZS {getTotalAmount().toLocaleString()}</span>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="notes">Order Notes</Label>
-                      <Textarea
-                        id="notes"
-                        placeholder="Any special instructions..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="payWithCredit"
-                        checked={payWithCredit}
-                        onChange={e => setPayWithCredit(e.target.checked)}
-                        disabled={!creditAccount || creditAccount.status !== 'active'}
-                      />
-                      <Label htmlFor="payWithCredit" className="cursor-pointer">
-                        Pay with Credit
-                        {creditAccount && creditAccount.status === 'active' && (
-                          <span className="ml-2 text-xs text-green-700">Available: TZS {(creditAccount.credit_limit - creditAccount.current_balance).toLocaleString()}</span>
-                        )}
-                      </Label>
+                      {paymentMethod === 'cod' && deliveryLocation && (
+                        <div className="flex justify-between text-sm">
+                          <span>Delivery Fee:</span>
+                          <span>{formatTZS(getDeliveryFee())}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-lg">
+                        <span>Total:</span>
+                        <span>TZS {(getTotalAmount() + (paymentMethod === 'cod' && deliveryLocation ? getDeliveryFee() : 0)).toLocaleString()}</span>
+                      </div>
                     </div>
 
                     <Button
                       className="w-full"
-                      onClick={submitOrder}
-                      disabled={isLoading || !selectedSupplier}
+                      onClick={handleSubmit}
+                      disabled={
+                        isLoading ||
+                        createCODOrder.isPending ||
+                        (paymentMethod === 'credit' && !selectedSupplier) ||
+                        (paymentMethod === 'cod' && (!deliveryLocation || !deliveryPhone))
+                      }
                     >
-                      {isLoading ? (
+                      {isLoading || createCODOrder.isPending ? (
                         <>
                           <Clock className="h-4 w-4 mr-2 animate-spin" />
                           Submitting...
                         </>
+                      ) : paymentMethod === 'cod' ? (
+                        <>
+                          <Truck className="h-4 w-4 mr-2" />
+                          Place COD Order
+                        </>
                       ) : (
                         <>
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Submit Order
+                          Submit Purchase Order
                         </>
                       )}
                     </Button>
