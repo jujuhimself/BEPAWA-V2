@@ -77,7 +77,8 @@ class PrepPepServiceAPI {
 
   // ===== BROWSING (INDIVIDUAL) =====
   async getAvailableServices(): Promise<(PrepPepService & { lab: any })[]> {
-    // First try dedicated prep_pep_services table
+    // Only return services from the dedicated prep_pep_services table
+    // PrEP/PEP services are distinct from HIV self-test kits (which are in PersonalHealth)
     const { data, error } = await supabase
       .from('prep_pep_services')
       .select('*, lab:profiles!prep_pep_services_lab_id_fkey(id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude)')
@@ -86,35 +87,7 @@ class PrepPepServiceAPI {
 
     if (error) throw error;
     
-    // If we have services, return them
-    if (data && data.length > 0) {
-      return data as any[];
-    }
-    
-    // Fallback: create virtual services from pharmacies with self_test_available
-    const { data: pharmacies, error: phError } = await supabase
-      .from('profiles')
-      .select('id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude')
-      .eq('role', 'retail')
-      .eq('self_test_available', true)
-      .eq('is_approved', true);
-    
-    if (phError) throw phError;
-    
-    // Map pharmacies to virtual PrEP/PEP service entries
-    return (pharmacies || []).map((p: any) => ({
-      id: `virtual-${p.id}`,
-      lab_id: p.id,
-      service_type: 'hiv_self_test' as const,
-      is_available: true,
-      consultation_required: false,
-      stock_status: 'available' as const,
-      price: 15000,
-      description: 'HIV Self-Test Kit available for discreet delivery',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      lab: p,
-    }));
+    return (data || []) as any[];
   }
 
   // ===== BOOKINGS =====

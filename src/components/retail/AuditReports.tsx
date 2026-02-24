@@ -133,7 +133,7 @@ const AuditReports = () => {
     const csv = [
       ['Date', 'Action', 'Resource Type', 'Resource ID', 'Details'].join(','),
       ...filteredLogs.map(log => [
-        new Date(log.created_at).toLocaleString(),
+        new Date(log.created_at).toLocaleString('en-GB', { timeZone: 'Africa/Dar_es_Salaam' }),
         log.action,
         log.resource_type,
         log.resource_id || '',
@@ -277,7 +277,11 @@ const AuditReports = () => {
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
                         <Calendar className="h-3 w-3" />
-                        {new Date(log.created_at).toLocaleString()}
+                        {new Date(log.created_at).toLocaleString('en-GB', { 
+                          timeZone: 'Africa/Dar_es_Salaam',
+                          year: 'numeric', month: 'short', day: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })}
                       </div>
                     </TableCell>
                     <TableCell>{getActionBadge(log.action)}</TableCell>

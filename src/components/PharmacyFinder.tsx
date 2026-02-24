@@ -45,7 +45,7 @@ const PharmacyFinder = () => {
         // Map to Pharmacy interface - prioritize pharmacy_name over personal name
         const mappedPharmacies: Pharmacy[] = (data || []).map((profile: any) => ({
           id: profile.id,
-          name: profile.pharmacy_name || profile.business_name || 'Pharmacy',
+          name: profile.pharmacy_name || profile.business_name || profile.name || 'Pharmacy',
           address: profile.address || `${profile.city || ''}, ${profile.region || 'Tanzania'}`.trim().replace(/^,\s*/, ''),
           phone: profile.phone || 'N/A',
           rating: 4.5 + Math.random() * 0.5,
