@@ -460,6 +460,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         labLicense: userData.labLicense,
         specializations: userData.specializations?.join(','),
         operatingHours: userData.operatingHours,
+        latitude: (userData as any).latitude,
+        longitude: (userData as any).longitude,
       };
 
       // Use the actual site URL for the redirect

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Settings, Shield, Bell, Download, FileText, User, MessageSquare } from "lucide-react";
+import { Settings, Shield, Bell, Download, FileText, User, MessageSquare, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import LocationPicker, { LocationData } from "@/components/delivery/LocationPicker";
 
 const SystemSettings = () => {
   const { user } = useAuth();
@@ -401,20 +402,65 @@ const SystemSettings = () => {
                   <p className="text-sm text-muted-foreground">Displayed on your public pharmacy/business profile</p>
                 </div>
 
-                {/* Address */}
-                <div className="space-y-2">
-                  <Label htmlFor="business-address">Business Address</Label>
-                  <Input
-                    id="business-address"
-                    placeholder="Enter your business address"
-                    value={(settings as any).address || user?.address || ''}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      address: e.target.value
-                    } as any)}
-                  />
-                  <p className="text-sm text-muted-foreground">Used for delivery distance calculations and shown to customers</p>
-                </div>
+                {/* Business Location with Map */}
+                {(user?.role === 'retail' || user?.role === 'wholesale' || user?.role === 'lab') && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Business Location
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Update your exact location on the map for accurate delivery calculations and directory listings
+                    </p>
+                    <LocationPicker
+                      onLocationSelect={async (location) => {
+                        try {
+                          const { error } = await supabase
+                            .from('profiles')
+                            .update({
+                              address: location.address,
+                              latitude: location.latitude,
+                              longitude: location.longitude,
+                            })
+                            .eq('id', user.id);
+                          if (error) throw error;
+                          toast({
+                            title: "Location updated",
+                            description: "Your business location has been saved successfully.",
+                          });
+                        } catch (err: any) {
+                          toast({
+                            title: "Error",
+                            description: err.message || "Failed to update location.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      initialLocation={
+                        user?.address
+                          ? { latitude: 0, longitude: 0, address: user.address }
+                          : undefined
+                      }
+                      placeholder="Search for your business location..."
+                    />
+                  </div>
+                )}
+
+                {/* Fallback plain address for non-business roles */}
+                {user?.role !== 'retail' && user?.role !== 'wholesale' && user?.role !== 'lab' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="business-address">Address</Label>
+                    <Input
+                      id="business-address"
+                      placeholder="Enter your address"
+                      value={(settings as any).address || user?.address || ''}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        address: e.target.value
+                      } as any)}
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

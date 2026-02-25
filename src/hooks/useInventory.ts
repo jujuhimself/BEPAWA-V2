@@ -11,6 +11,9 @@ export const useProducts = () => {
     queryKey: ['products', user?.role],
     queryFn: () => inventoryService.getProducts(user?.role),
     enabled: !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes - prevents refetching on every focus
+    gcTime: 1000 * 60 * 10, // 10 minutes cache
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -19,6 +22,7 @@ export const useProduct = (productId: string) => {
     queryKey: ['product', productId],
     queryFn: () => inventoryService.getProduct(productId),
     enabled: !!productId,
+    staleTime: 1000 * 60 * 2,
   });
 };
 
@@ -108,14 +112,17 @@ export const useInventoryAnalytics = () => {
     queryFn: async () => {
       if (!user) return null;
       
-      // Get real analytics data from Supabase
-      const products = await inventoryService.getProducts(user.role);
-      const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('total_amount, created_at, status')
-        .eq('user_id', user.id);
+      // Run product and order queries in parallel for speed
+      const [products, ordersResult] = await Promise.all([
+        inventoryService.getProducts(user.role),
+        supabase
+          .from('orders')
+          .select('total_amount, status')
+          .eq('user_id', user.id)
+      ]);
 
-      if (ordersError) throw ordersError;
+      if (ordersResult.error) throw ordersResult.error;
+      const orders = ordersResult.data;
 
       const totalProducts = products?.length || 0;
       const lowStockProducts = products?.filter(p => p.stock <= p.min_stock).length || 0;
@@ -132,6 +139,9 @@ export const useInventoryAnalytics = () => {
       };
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 3, // 3 minutes
+    gcTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -142,6 +152,8 @@ export const useLowStockProducts = () => {
     queryKey: ['low-stock-products', user?.id],
     queryFn: () => inventoryService.getLowStockProducts(),
     enabled: !!user,
+    staleTime: 1000 * 60 * 3,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -152,6 +164,8 @@ export const useExpiringProducts = (days: number = 30) => {
     queryKey: ['expiring-products', user?.id, days],
     queryFn: () => inventoryService.getExpiringProducts(days),
     enabled: !!user,
+    staleTime: 1000 * 60 * 3,
+    refetchOnWindowFocus: false,
   });
 };
 
