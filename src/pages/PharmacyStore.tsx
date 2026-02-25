@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, MapPin, Phone, ArrowLeft, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ShoppingCart, MapPin, Phone, ArrowLeft, Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ const PharmacyStore = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchPharmacyAndProducts = async () => {
@@ -219,6 +221,23 @@ const PharmacyStore = () => {
           </CardHeader>
         </Card>
 
+        {/* Search Bar */}
+        {products.length > 0 && (
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Search products by name, category..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Products Grid */}
         {products.length === 0 ? (
           <Card>
@@ -230,7 +249,15 @@ const PharmacyStore = () => {
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
+            {products
+              .filter(p => {
+                if (!searchTerm) return true;
+                const q = searchTerm.toLowerCase();
+                return p.name?.toLowerCase().includes(q) || 
+                       p.category?.toLowerCase().includes(q) ||
+                       p.description?.toLowerCase().includes(q);
+              })
+              .map((product) => (
               <Card key={product.id} className="flex flex-col hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <CardTitle className="text-lg">{product.name}</CardTitle>
@@ -271,7 +298,8 @@ const PharmacyStore = () => {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+            ))
+            }
           </div>
         )}
       </div>

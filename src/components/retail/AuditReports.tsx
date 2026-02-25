@@ -46,12 +46,16 @@ const AuditReports = () => {
     if (!user) return;
 
     try {
+      // For staff users, also fetch employer's audit logs
+      const userId = user.id;
+      
+      // Query audit logs for the user OR where user is the retailer/wholesaler
       const { data, error } = await supabase
         .from('audit_logs')
         .select('*')
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${userId},retailer_id.eq.${userId},wholesaler_id.eq.${userId}`)
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .limit(500);
 
       if (error) throw error;
       setAuditLogs(data || []);
