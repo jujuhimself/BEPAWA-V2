@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,11 +17,13 @@ interface AuditLog {
   id: string;
   user_id: string;
   action: string;
-  table_name: string;
-  record_id: string;
+  resource_type: string;
+  resource_id: string | null;
   old_values: any;
   new_values: any;
-  ip_address: string;
+  details: any;
+  category: string | null;
+  ip_address: string | null;
   created_at: string;
 }
 
@@ -36,8 +38,8 @@ const reportTypes = [
   { value: 'all', label: 'All Activities' },
   { value: 'inventory', label: 'Inventory Changes' },
   { value: 'orders', label: 'Order Activities' },
-  { value: 'users', label: 'User Actions' },
-  { value: 'financial', label: 'Financial Transactions' }
+  { value: 'authentication', label: 'User Actions' },
+  { value: 'settings', label: 'Settings Changes' }
 ];
 
 const timeRanges = [
@@ -46,7 +48,7 @@ const timeRanges = [
   { value: 'month', label: 'This Month' },
   { value: 'quarter', label: 'This Quarter' },
   { value: 'year', label: 'This Year' },
-  { value: 'custom', label: 'Custom Range' }
+  { value: 'all', label: 'All Time' }
 ];
 
 export default function AuditReports() {
@@ -54,18 +56,12 @@ export default function AuditReports() {
   const { toast } = useToast();
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<ActivitySummary>({
-    total_actions: 0,
-    today_actions: 0,
-    this_week_actions: 0,
-    this_month_actions: 0
-  });
+  const [userProfiles, setUserProfiles] = useState<Record<string, string>>({});
   
   // Filters
   const [selectedReportType, setSelectedReportType] = useState('all');
   const [selectedTimeRange, setSelectedTimeRange] = useState('month');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUser, setSelectedUser] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -73,129 +69,75 @@ export default function AuditReports() {
     }
   }, [user, selectedReportType, selectedTimeRange]);
 
+  const getDateFilter = () => {
+    const now = new Date();
+    switch (selectedTimeRange) {
+      case 'today':
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      case 'week':
+        return new Date(now.getTime() - 7 * 86400000).toISOString();
+      case 'month':
+        return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).toISOString();
+      case 'quarter':
+        return new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()).toISOString();
+      case 'year':
+        return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString();
+      default:
+        return null;
+    }
+  };
+
   const loadAuditData = async () => {
     if (!user) return;
     
     try {
       setLoading(true);
-      
-      // Enhanced mock audit data with more realistic entries
-      const mockAuditLogs: AuditLog[] = [
-        {
-          id: '1',
-          user_id: user.id,
-          action: 'create',
-          table_name: 'products',
-          record_id: 'prod-123',
-          old_values: null,
-          new_values: { name: 'Paracetamol 500mg', stock: 100, price: 2500 },
-          ip_address: '192.168.1.1',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          user_id: user.id,
-          action: 'update',
-          table_name: 'inventory_adjustments',
-          record_id: 'adj-456',
-          old_values: { quantity: 10 },
-          new_values: { quantity: 15 },
-          ip_address: '192.168.1.1',
-          created_at: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: '3',
-          user_id: user.id,
-          action: 'create',
-          table_name: 'orders',
-          record_id: 'ord-789',
-          old_values: null,
-          new_values: { total_amount: 15000, status: 'pending' },
-          ip_address: '192.168.1.2',
-          created_at: new Date(Date.now() - 172800000).toISOString()
-        },
-        {
-          id: '4',
-          user_id: user.id,
-          action: 'update',
-          table_name: 'products',
-          record_id: 'prod-124',
-          old_values: { stock: 50, price: 3000 },
-          new_values: { stock: 45, price: 3200 },
-          ip_address: '192.168.1.3',
-          created_at: new Date(Date.now() - 259200000).toISOString()
-        },
-        {
-          id: '5',
-          user_id: user.id,
-          action: 'delete',
-          table_name: 'products',
-          record_id: 'prod-125',
-          old_values: { name: 'Expired Medicine', stock: 0 },
-          new_values: null,
-          ip_address: '192.168.1.1',
-          created_at: new Date(Date.now() - 345600000).toISOString()
-        },
-        {
-          id: '6',
-          user_id: user.id,
-          action: 'create',
-          table_name: 'suppliers',
-          record_id: 'sup-001',
-          old_values: null,
-          new_values: { name: 'MedSupply Ltd', contact: '+255123456789' },
-          ip_address: '192.168.1.4',
-          created_at: new Date(Date.now() - 432000000).toISOString()
-        },
-        {
-          id: '7',
-          user_id: user.id,
-          action: 'update',
-          table_name: 'orders',
-          record_id: 'ord-790',
-          old_values: { status: 'pending' },
-          new_values: { status: 'completed' },
-          ip_address: '192.168.1.2',
-          created_at: new Date(Date.now() - 518400000).toISOString()
-        },
-        {
-          id: '8',
-          user_id: user.id,
-          action: 'create',
-          table_name: 'prescriptions',
-          record_id: 'pres-001',
-          old_values: null,
-          new_values: { patient_name: 'John Doe', medication: 'Amoxicillin' },
-          ip_address: '192.168.1.5',
-          created_at: new Date(Date.now() - 604800000).toISOString()
-        },
-        {
-          id: '9',
-          user_id: user.id,
-          action: 'update',
-          table_name: 'inventory_adjustments',
-          record_id: 'adj-457',
-          old_values: { reason: 'Damaged goods' },
-          new_values: { reason: 'Damaged goods', quantity: 5 },
-          ip_address: '192.168.1.1',
-          created_at: new Date(Date.now() - 691200000).toISOString()
-        },
-        {
-          id: '10',
-          user_id: user.id,
-          action: 'create',
-          table_name: 'users',
-          record_id: 'usr-002',
-          old_values: null,
-          new_values: { name: 'Jane Smith', role: 'pharmacist' },
-          ip_address: '192.168.1.6',
-          created_at: new Date(Date.now() - 777600000).toISOString()
-        }
-      ];
-      
-      setAuditLogs(mockAuditLogs);
-      calculateSummary(mockAuditLogs);
-      
+
+      let query = supabase
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      // Scope by org: retail uses retailer_id, wholesale uses wholesaler_id
+      if (user.role === 'retail') {
+        query = query.eq('retailer_id', user.id);
+      } else if (user.role === 'wholesale') {
+        query = query.eq('wholesaler_id', user.id);
+      } else {
+        query = query.eq('user_id', user.id);
+      }
+
+      // Category filter
+      if (selectedReportType !== 'all') {
+        query = query.eq('category', selectedReportType);
+      }
+
+      // Time filter
+      const dateFilter = getDateFilter();
+      if (dateFilter) {
+        query = query.gte('created_at', dateFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const logs = (data || []) as AuditLog[];
+      setAuditLogs(logs);
+
+      // Fetch user profiles for display names
+      const userIds = Array.from(new Set(logs.map(l => l.user_id)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, email, pharmacy_name, business_name')
+          .in('id', userIds);
+        const map: Record<string, string> = {};
+        (profiles || []).forEach((p: any) => {
+          map[p.id] = p.name || p.pharmacy_name || p.business_name || p.email || p.id;
+        });
+        setUserProfiles(map);
+      }
     } catch (error) {
       console.error('Error loading audit data:', error);
       toast({
@@ -208,32 +150,25 @@ export default function AuditReports() {
     }
   };
 
-  const calculateSummary = (logs: AuditLog[]) => {
+  const summary = useMemo<ActivitySummary>(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-
-    const todayActions = logs.filter(log => new Date(log.created_at) >= today).length;
-    const weekActions = logs.filter(log => new Date(log.created_at) >= weekAgo).length;
-    const monthActions = logs.filter(log => new Date(log.created_at) >= monthAgo).length;
-
-    setSummary({
-      total_actions: logs.length,
-      today_actions: todayActions,
-      this_week_actions: weekActions,
-      this_month_actions: monthActions
-    });
-  };
+    const weekAgo = new Date(today.getTime() - 7 * 86400000);
+    const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    return {
+      total_actions: auditLogs.length,
+      today_actions: auditLogs.filter(l => new Date(l.created_at) >= today).length,
+      this_week_actions: auditLogs.filter(l => new Date(l.created_at) >= weekAgo).length,
+      this_month_actions: auditLogs.filter(l => new Date(l.created_at) >= monthAgo).length,
+    };
+  }, [auditLogs]);
 
   const filteredLogs = auditLogs.filter(log => {
     const matchesSearch = searchTerm === '' || 
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.table_name.toLowerCase().includes(searchTerm.toLowerCase());
+      log.resource_type.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesUser = selectedUser === '' || log.user_id === selectedUser;
-    
-    return matchesSearch && matchesUser;
+    return matchesSearch;
   });
 
   const exportReport = async (format: 'csv' | 'pdf') => {
@@ -286,12 +221,7 @@ export default function AuditReports() {
   };
 
   const getUserDisplayName = (userId: string) => {
-    // In a real app, this would fetch from a users table
-    // For now, return a friendly name based on the current user
-    if (userId === user?.id) {
-      return user?.name || user?.pharmacyName || 'Current User';
-    }
-    return `User ${userId.slice(0, 8)}...`;
+    return userProfiles[userId] || `User ${userId.slice(0, 8)}...`;
   };
 
   if (loading) {
@@ -439,18 +369,6 @@ export default function AuditReports() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>User</Label>
-              <Select value={selectedUser} onValueChange={setSelectedUser}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All users" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All users</SelectItem>
-                  {/* This would be populated with actual users */}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -478,7 +396,7 @@ export default function AuditReports() {
                     <TableHead>Timestamp</TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Action</TableHead>
-                    <TableHead>Table</TableHead>
+                    <TableHead>Resource</TableHead>
                     <TableHead>Record ID</TableHead>
                     <TableHead>IP Address</TableHead>
                   </TableRow>
@@ -499,10 +417,10 @@ export default function AuditReports() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{log.table_name}</Badge>
+                        <Badge variant="outline" className="capitalize">{log.resource_type}</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {log.record_id}
+                        {log.resource_id || '-'}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {log.ip_address}
