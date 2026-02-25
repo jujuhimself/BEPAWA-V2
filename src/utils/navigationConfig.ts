@@ -212,6 +212,32 @@ export class NavigationMenuConfig {
 
   getMenuItems(): NavigationItem[] {
     const allItems = this.getNavigationItems();
-    return allItems[this.role] || allItems['retail'];
+    let roleItems = allItems[this.role] || allItems['retail'];
+    
+    // Apply same staff permission filtering as getMenuGroups
+    if (this.staffPermissions) {
+      const permissionToLabels: Record<string, string[]> = {
+        pos: ['POS'],
+        inventory: ['Inventory', 'Inventory Dashboard', 'Browse Products'],
+        orders: ['Orders', 'Wholesale Orders', 'Cart', 'Retailer Orders', 'Purchase Orders', 'My Orders'],
+        business_tools: ['Business Center', 'Business Operations Hub'],
+        analytics: ['Analytics'],
+        credit_crm: ['Credit Request', 'Credit Management', 'Retailers'],
+        audit: ['Audit Logs'],
+        alerts: ['Alerts'],
+      };
+      
+      const allowedLabels = new Set(['Dashboard', 'Settings', 'Subscription']);
+      
+      Object.entries(this.staffPermissions).forEach(([perm, enabled]) => {
+        if (enabled && permissionToLabels[perm]) {
+          permissionToLabels[perm].forEach(label => allowedLabels.add(label));
+        }
+      });
+      
+      roleItems = roleItems.filter(item => allowedLabels.has(item.label));
+    }
+    
+    return roleItems;
   }
 }

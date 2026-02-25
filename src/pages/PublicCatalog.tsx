@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, Plus, Search, Package, Clock, CheckCircle, Minus } from "lucide-react";
+import { ShoppingCart, Plus, Search, Package, Clock, CheckCircle, Minus, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -76,7 +76,7 @@ const PublicCatalog = () => {
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, pharmacy_name, business_name, name')
+          .select('id, pharmacy_name, business_name, name, address, city, region')
           .in('id', userIds);
         
         profilesMap = (profiles || []).reduce((acc: Record<string, any>, p: any) => {
@@ -91,6 +91,7 @@ const PublicCatalog = () => {
         const ownerName = owner?.pharmacy_name || owner?.business_name || owner?.name;
         const branchName = product.branch?.name;
         const displayName = ownerName || branchName || 'Local Pharmacy';
+        const ownerAddress = owner?.address || [owner?.city, owner?.region].filter(Boolean).join(', ') || '';
         
         return {
           ...product,
@@ -98,6 +99,7 @@ const PublicCatalog = () => {
           min_stock: product.min_stock_level || 0,
           wholesaler_name: displayName,
           pharmacy_name: displayName,
+          pharmacy_address: ownerAddress,
           pharmacy_id: product.branch_id || product.pharmacy_id || product.user_id || ''
         };
       });
@@ -500,6 +502,12 @@ const PublicCatalog = () => {
                           )}
                           {!(product as any).wholesaler_name && product.pharmacy_name && (
                             <p className="text-sm text-muted-foreground">{product.pharmacy_name}</p>
+                          )}
+                          {(product as any).pharmacy_address && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              {(product as any).pharmacy_address}
+                            </p>
                           )}
                           <div className="flex gap-1 mt-2">
                             {product.is_retail_product && <Badge variant="outline" className="text-xs">Retail</Badge>}

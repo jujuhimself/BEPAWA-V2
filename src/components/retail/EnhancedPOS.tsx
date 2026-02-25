@@ -79,10 +79,13 @@ const EnhancedPOS = () => {
     if (!user) return;
 
     try {
+      // Staff users operate as their employer (user.id is already the employer's id)
+      const ownerId = user.id;
+      
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${ownerId},pharmacy_id.eq.${ownerId}`)
         .gt('stock', 0)
         .order('name');
 
@@ -182,9 +185,10 @@ const EnhancedPOS = () => {
     }
 
     try {
-      // Create POS sale record
+      // Create POS sale record - user.id is employer id for staff
+      const ownerId = user.id;
       const saleData = {
-        user_id: user.id,
+        user_id: ownerId,
         total_amount: getCartTotal(),
         payment_method: paymentMethod,
         customer_name: customerName || null,
@@ -224,12 +228,12 @@ const EnhancedPOS = () => {
         await supabase
           .from('inventory_movements')
           .insert({
-            user_id: user.id,
+            user_id: ownerId,
             product_id: item.id,
             movement_type: 'out',
             quantity: item.quantity,
-            reason: 'POS Sale',
-            created_by: user.id
+            reason: `POS Sale${user.isStaff ? ` (by staff: ${staffName})` : ''}`,
+            created_by: ownerId
           });
       }
 

@@ -38,12 +38,35 @@ const PharmacyFinder = () => {
           .select('*')
           .eq('role', 'retail')
           .eq('is_approved', true)
-          .limit(20);
+          .limit(50);
 
         if (error) throw error;
 
-        // Map to Pharmacy interface - prioritize pharmacy_name over personal name
-        const mappedPharmacies: Pharmacy[] = (data || []).map((profile: any) => ({
+        // Get all staff member user_ids to filter them out
+        // Staff accounts have their profile id as user_id in staff_members table
+        const profileIds = (data || []).map((p: any) => p.id);
+        let staffUserIds = new Set<string>();
+        if (profileIds.length > 0) {
+          const { data: staffData } = await supabase
+            .from('staff_members')
+            .select('user_id')
+            .in('user_id', profileIds);
+          staffUserIds = new Set((staffData || []).map((s: any) => s.user_id).filter(Boolean));
+        }
+
+        // Also check: real pharmacies typically have pharmacy_name set
+        // Staff accounts that got role='retail' via ensureStaffProfileRole won't have it
+
+        // Map to Pharmacy interface - filter out staff accounts
+        const mappedPharmacies: Pharmacy[] = (data || [])
+          .filter((profile: any) => {
+            // Exclude if this profile is a staff member
+            if (staffUserIds.has(profile.id)) return false;
+            // Exclude if no pharmacy_name and no business_name (likely a staff account with role changed to retail)
+            if (!profile.pharmacy_name && !profile.business_name) return false;
+            return true;
+          })
+          .map((profile: any) => ({
           id: profile.id,
           name: profile.pharmacy_name || profile.business_name || profile.name || 'Pharmacy',
           address: profile.address || `${profile.city || ''}, ${profile.region || 'Tanzania'}`.trim().replace(/^,\s*/, ''),

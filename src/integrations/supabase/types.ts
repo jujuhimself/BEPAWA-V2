@@ -2177,6 +2177,8 @@ export type Database = {
           description: string | null
           id: string
           is_available: boolean
+          is_tagged_pep: boolean
+          is_tagged_prep: boolean
           lab_id: string
           price: number
           service_type: string
@@ -2189,6 +2191,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_available?: boolean
+          is_tagged_pep?: boolean
+          is_tagged_prep?: boolean
           lab_id: string
           price?: number
           service_type: string
@@ -2201,6 +2205,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_available?: boolean
+          is_tagged_pep?: boolean
+          is_tagged_prep?: boolean
           lab_id?: string
           price?: number
           service_type?: string
@@ -2422,6 +2428,8 @@ export type Database = {
           expiry_date: string | null
           id: string
           image_url: string | null
+          is_hiv_test_kit: boolean
+          is_prep_pep: boolean
           is_public_product: boolean | null
           is_retail_product: boolean | null
           is_wholesale_product: boolean | null
@@ -2455,6 +2463,8 @@ export type Database = {
           expiry_date?: string | null
           id?: string
           image_url?: string | null
+          is_hiv_test_kit?: boolean
+          is_prep_pep?: boolean
           is_public_product?: boolean | null
           is_retail_product?: boolean | null
           is_wholesale_product?: boolean | null
@@ -2488,6 +2498,8 @@ export type Database = {
           expiry_date?: string | null
           id?: string
           image_url?: string | null
+          is_hiv_test_kit?: boolean
+          is_prep_pep?: boolean
           is_public_product?: boolean | null
           is_retail_product?: boolean | null
           is_wholesale_product?: boolean | null
@@ -3858,6 +3870,8 @@ export type Database = {
           expiry_date: string | null
           id: string
           image_url: string | null
+          is_hiv_test_kit: boolean
+          is_prep_pep: boolean
           is_public_product: boolean | null
           is_retail_product: boolean | null
           is_wholesale_product: boolean | null
@@ -3900,6 +3914,8 @@ export type Database = {
           expiry_date: string | null
           id: string
           image_url: string | null
+          is_hiv_test_kit: boolean
+          is_prep_pep: boolean
           is_public_product: boolean | null
           is_retail_product: boolean | null
           is_wholesale_product: boolean | null
