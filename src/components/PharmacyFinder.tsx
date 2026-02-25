@@ -38,12 +38,26 @@ const PharmacyFinder = () => {
           .select('*')
           .eq('role', 'retail')
           .eq('is_approved', true)
-          .limit(20);
+          .limit(50);
 
         if (error) throw error;
 
-        // Map to Pharmacy interface - prioritize pharmacy_name over personal name
-        const mappedPharmacies: Pharmacy[] = (data || []).map((profile: any) => ({
+        // Get all staff member user_ids to filter them out
+        const profileIds = (data || []).map((p: any) => p.id);
+        let staffUserIds = new Set<string>();
+        if (profileIds.length > 0) {
+          const { data: staffData } = await supabase
+            .from('staff_members')
+            .select('user_id')
+            .in('user_id', profileIds)
+            .eq('is_active', true);
+          staffUserIds = new Set((staffData || []).map((s: any) => s.user_id).filter(Boolean));
+        }
+
+        // Map to Pharmacy interface - filter out staff accounts
+        const mappedPharmacies: Pharmacy[] = (data || [])
+          .filter((profile: any) => !staffUserIds.has(profile.id))
+          .map((profile: any) => ({
           id: profile.id,
           name: profile.pharmacy_name || profile.business_name || profile.name || 'Pharmacy',
           address: profile.address || `${profile.city || ''}, ${profile.region || 'Tanzania'}`.trim().replace(/^,\s*/, ''),
