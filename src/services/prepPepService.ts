@@ -77,17 +77,51 @@ class PrepPepServiceAPI {
 
   // ===== BROWSING (INDIVIDUAL) =====
   async getAvailableServices(): Promise<(PrepPepService & { lab: any })[]> {
-    // Only return services from the dedicated prep_pep_services table
-    // PrEP/PEP services are distinct from HIV self-test kits (which are in PersonalHealth)
-    const { data, error } = await supabase
+    // Get services from the dedicated prep_pep_services table (labs)
+    const { data: labServices, error } = await supabase
       .from('prep_pep_services')
       .select('*, lab:profiles!prep_pep_services_lab_id_fkey(id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude)')
       .eq('is_available', true)
       .eq('stock_status', 'available');
 
     if (error) throw error;
-    
-    return (data || []) as any[];
+
+    // Also get pharmacies with is_prep_pep tagged products
+    const { data: prepPepProducts } = await supabase
+      .from('products')
+      .select('id, name, sell_price, description, user_id, stock')
+      .eq('is_prep_pep', true)
+      .gt('stock', 0);
+
+    const pharmacyServices: any[] = [];
+    if (prepPepProducts && prepPepProducts.length > 0) {
+      const pharmacyIds = [...new Set(prepPepProducts.map(p => p.user_id))];
+      const { data: pharmacyProfiles } = await supabase
+        .from('profiles')
+        .select('id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude')
+        .in('id', pharmacyIds);
+
+      for (const product of prepPepProducts) {
+        const pharmacy = pharmacyProfiles?.find(p => p.id === product.user_id);
+        if (pharmacy) {
+          pharmacyServices.push({
+            id: `product-${product.id}`,
+            lab_id: product.user_id,
+            service_type: 'prep', // Default, could be refined
+            is_available: true,
+            consultation_required: false,
+            stock_status: 'available',
+            price: product.sell_price || 0,
+            description: product.description || product.name,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            lab: pharmacy,
+          });
+        }
+      }
+    }
+
+    return [...(labServices || []), ...pharmacyServices] as any[];
   }
 
   // ===== BOOKINGS =====

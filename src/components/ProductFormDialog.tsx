@@ -33,7 +33,9 @@ const ProductFormDialog = ({ open, onOpenChange, productId, mode = 'add' }: Prod
     supplier: "",
     expiry_date: "",
     batch_number: "",
-    is_public_product: false
+    is_public_product: false,
+    is_hiv_test_kit: false,
+    is_prep_pep: false,
   });
 
   // Prefill form in edit mode
@@ -52,7 +54,9 @@ const ProductFormDialog = ({ open, onOpenChange, productId, mode = 'add' }: Prod
         supplier: product.supplier || '',
         expiry_date: product.expiry_date || '',
         batch_number: product.batch_number || '',
-        is_public_product: !!product.is_public_product
+        is_public_product: !!product.is_public_product,
+        is_hiv_test_kit: !!(product as any).is_hiv_test_kit,
+        is_prep_pep: !!(product as any).is_prep_pep,
       });
     }
     if (mode === 'add' && open) {
@@ -69,7 +73,9 @@ const ProductFormDialog = ({ open, onOpenChange, productId, mode = 'add' }: Prod
         supplier: "",
         expiry_date: "",
         batch_number: "",
-        is_public_product: false
+        is_public_product: false,
+        is_hiv_test_kit: false,
+        is_prep_pep: false,
       });
     }
   }, [mode, product, open]);
@@ -252,6 +258,38 @@ const ProductFormDialog = ({ open, onOpenChange, productId, mode = 'add' }: Prod
               Note: For wholesalers, public products are visible to retailers, not individuals.
             </div>
           )}
+
+          {/* HIV Test Kit Toggle */}
+          <div className="flex items-center space-x-2">
+            <input
+              id="is_hiv_test_kit"
+              type="checkbox"
+              checked={formData.is_hiv_test_kit}
+              onChange={e => handleChange('is_hiv_test_kit', e.target.checked)}
+            />
+            <Label htmlFor="is_hiv_test_kit">
+              🧪 This is an HIV Test Kit
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground pl-6 -mt-2">
+            Tag this product so it appears in the HIV Self-Test directory for individuals.
+          </p>
+
+          {/* PrEP/PEP Toggle */}
+          <div className="flex items-center space-x-2">
+            <input
+              id="is_prep_pep"
+              type="checkbox"
+              checked={formData.is_prep_pep}
+              onChange={e => handleChange('is_prep_pep', e.target.checked)}
+            />
+            <Label htmlFor="is_prep_pep">
+              💊 This is a PrEP/PEP Product
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground pl-6 -mt-2">
+            Tag this product so it appears in the PrEP/PEP services directory.
+          </p>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

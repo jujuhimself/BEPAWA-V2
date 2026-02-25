@@ -68,12 +68,24 @@ const PersonalHealth = () => {
   useEffect(() => {
     if (activeTab === 'hiv') {
       setLoadingHiv(true);
+      // Query pharmacies that actually have HIV test kit products tagged
       supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'retail')
-        .eq('self_test_available', true)
-        .then(({ data }) => {
+        .from('products')
+        .select('user_id')
+        .eq('is_hiv_test_kit', true)
+        .gt('stock', 0)
+        .then(async ({ data: products }) => {
+          const pharmacyIds = [...new Set((products || []).map((p: any) => p.user_id))];
+          if (pharmacyIds.length === 0) {
+            setHivPharmacies([]);
+            setLoadingHiv(false);
+            return;
+          }
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .in('id', pharmacyIds)
+            .eq('role', 'retail');
           setHivPharmacies(data || []);
           setLoadingHiv(false);
         });
