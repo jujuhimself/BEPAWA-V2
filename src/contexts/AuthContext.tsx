@@ -16,6 +16,7 @@ export interface StaffInfo {
 
 export interface User {
   id: string;
+  authUserId: string;
   email: string;
   name: string;
   role: 'admin' | 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery';
@@ -97,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const convertProfileToUser = (profile: any, supabaseUser: SupabaseUser, staffInfo?: StaffInfo | null): User => {
     return {
       id: staffInfo ? staffInfo.employerId : profile.id, // Staff users operate as their employer
+      authUserId: supabaseUser.id,
       email: profile.email,
       name: profile.name,
       role: profile.role,
@@ -144,13 +146,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check and link staff invitation on registration/login, returns StaffInfo
   const checkAndLinkStaffInvitation = async (userId: string, email: string): Promise<StaffInfo | null> => {
     try {
-      // First check if already linked
-      const { data: linkedStaff, error: linkedError } = await supabase
+      // Get active staff links for this auth user (handle duplicates safely)
+      const { data: linkedStaffRows, error: linkedError } = await supabase
         .from('staff_members')
         .select('*')
         .eq('user_id', userId)
         .eq('is_active', true)
-        .maybeSingle();
+        .order('updated_at', { ascending: false })
+        .limit(10);
+
+      if (linkedError) {
+        console.error('Error checking linked staff records:', linkedError);
+      }
+
+      const linkedStaff = (linkedStaffRows || [])[0];
 
       if (linkedStaff) {
         // Ensure profile role matches employer's role (fix mismatches)
@@ -165,18 +174,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      // Find any pending staff invitation for this email
-      const { data: staffInvitation, error } = await supabase
+      // Find pending staff invitations for this email and pick the latest
+
+      const { data: invitations, error } = await supabase
         .from('staff_members')
         .select('*')
         .eq('email', email.toLowerCase())
         .is('user_id', null)
-        .maybeSingle();
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
       if (error) {
         console.error('Error checking staff invitation:', error);
         return null;
       }
+
+      const staffInvitation = (invitations || [])[0];
 
       if (staffInvitation) {
         // Link the user to the staff member record
@@ -195,6 +209,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         console.log('Staff invitation linked successfully:', staffInvitation);
+
 
         // Update profile role to match employer's role so dashboard routing works
         await ensureStaffProfileRole(userId, staffInvitation.pharmacy_id);
@@ -528,8 +543,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const nextBillingDate = new Date(complimentaryEndDate.getTime() + 30 * 24 * 60 * 60 * 1000); // Next billing after complimentary
 
       const newSubscription: UserSubscription = {
-        id: user.id, // Using user.id as the subscription ID since it's in the profiles table
-        userId: user.id,
+        id: user.id, // Using organization id
+        userId: user.authUserId || user.id,
         plan,
         status: 'trial',
         startDate: now.toISOString(),
