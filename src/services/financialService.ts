@@ -32,12 +32,9 @@ export interface FinancialSummary {
 }
 
 class FinancialService {
-  // Note: financial_transactions table may not exist in the database
-  // This service provides a placeholder implementation that returns empty data
   async getTransactions(userId: string, dateRange?: { from: Date; to: Date }): Promise<FinancialTransaction[]> {
     try {
-      // Since the table doesn't exist, return empty array
-      console.warn('financial_transactions table not available');
+      // financial_transactions table doesn't exist, return empty
       return [];
     } catch (error) {
       console.error('Error fetching financial transactions:', error);
@@ -47,8 +44,6 @@ class FinancialService {
 
   async addTransaction(transaction: Omit<FinancialTransaction, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<FinancialTransaction | null> {
     try {
-      // Since the table doesn't exist, return null
-      console.warn('financial_transactions table not available');
       return null;
     } catch (error) {
       console.error('Error adding financial transaction:', error);
@@ -56,59 +51,95 @@ class FinancialService {
     }
   }
 
+  /**
+   * Build a financial summary from POS sales + orders (real revenue data)
+   */
   async getFinancialSummary(userId: string, dateRange?: { from: Date; to: Date }): Promise<FinancialSummary> {
     try {
-      const transactions = await this.getTransactions(userId, dateRange);
-      
-      const totalIncome = transactions
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + t.amount, 0);
-      
-      const totalExpenses = transactions
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + t.amount, 0);
-      
+      // Fetch POS sales as income
+      let posSalesQuery = supabase
+        .from('pos_sales')
+        .select('total_amount, sale_date, created_at')
+        .eq('user_id', userId);
+
+      if (dateRange) {
+        posSalesQuery = posSalesQuery
+          .gte('sale_date', dateRange.from.toISOString())
+          .lte('sale_date', dateRange.to.toISOString());
+      }
+
+      const { data: posSales } = await posSalesQuery;
+
+      // Fetch orders where this user is the pharmacy (incoming orders = income)
+      let ordersQuery = supabase
+        .from('orders')
+        .select('total_amount, created_at, status')
+        .eq('pharmacy_id', userId)
+        .in('status', ['delivered', 'completed', 'paid']);
+
+      if (dateRange) {
+        ordersQuery = ordersQuery
+          .gte('created_at', dateRange.from.toISOString())
+          .lte('created_at', dateRange.to.toISOString());
+      }
+
+      const { data: orders } = await ordersQuery;
+
+      // Fetch purchase orders placed by this user (expenses)
+      let purchaseQuery = supabase
+        .from('orders')
+        .select('total_amount, created_at, status')
+        .eq('user_id', userId)
+        .in('status', ['delivered', 'completed', 'paid']);
+
+      if (dateRange) {
+        purchaseQuery = purchaseQuery
+          .gte('created_at', dateRange.from.toISOString())
+          .lte('created_at', dateRange.to.toISOString());
+      }
+
+      const { data: purchases } = await purchaseQuery;
+
+      // Calculate income from POS + incoming orders
+      const posIncome = (posSales || []).reduce((sum, s) => sum + (s.total_amount || 0), 0);
+      const orderIncome = (orders || []).reduce((sum, o) => sum + (o.total_amount || 0), 0);
+      const totalIncome = posIncome + orderIncome;
+
+      // Calculate expenses from purchases
+      const totalExpenses = (purchases || []).reduce((sum, p) => sum + (p.total_amount || 0), 0);
+
       const netProfit = totalIncome - totalExpenses;
       const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
 
-      // Monthly data
-      const monthlyData = transactions.reduce((acc, transaction) => {
-        const month = new Date(transaction.transaction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-        const existing = acc.find(item => item.month === month);
-        
-        if (existing) {
-          if (transaction.type === 'income') {
-            existing.income += transaction.amount;
-          } else {
-            existing.expenses += transaction.amount;
-          }
-          existing.profit = existing.income - existing.expenses;
-        } else {
-          acc.push({
-            month,
-            income: transaction.type === 'income' ? transaction.amount : 0,
-            expenses: transaction.type === 'expense' ? transaction.amount : 0,
-            profit: transaction.type === 'income' ? transaction.amount : -transaction.amount
-          });
-        }
-        
-        return acc;
-      }, [] as Array<{ month: string; income: number; expenses: number; profit: number; }>);
+      // Build monthly data
+      const monthlyMap = new Map<string, { income: number; expenses: number }>();
+
+      const addToMonth = (dateStr: string, amount: number, type: 'income' | 'expense') => {
+        const d = new Date(dateStr);
+        const key = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        const existing = monthlyMap.get(key) || { income: 0, expenses: 0 };
+        if (type === 'income') existing.income += amount;
+        else existing.expenses += amount;
+        monthlyMap.set(key, existing);
+      };
+
+      (posSales || []).forEach(s => addToMonth(s.sale_date || s.created_at, s.total_amount || 0, 'income'));
+      (orders || []).forEach(o => addToMonth(o.created_at, o.total_amount || 0, 'income'));
+      (purchases || []).forEach(p => addToMonth(p.created_at, p.total_amount || 0, 'expense'));
+
+      const monthlyData = Array.from(monthlyMap.entries()).map(([month, data]) => ({
+        month,
+        income: data.income,
+        expenses: data.expenses,
+        profit: data.income - data.expenses
+      }));
 
       // Category breakdown
-      const categoryMap = new Map<string, number>();
-      transactions.forEach(t => {
-        const current = categoryMap.get(t.category) || 0;
-        categoryMap.set(t.category, current + t.amount);
-      });
-
-      const categoryBreakdown = Array.from(categoryMap.entries())
-        .map(([category, amount]) => ({
-          category,
-          amount,
-          percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
-        }))
-        .sort((a, b) => b.amount - a.amount);
+      const categoryBreakdown = [
+        { category: 'POS Sales', amount: posIncome, percentage: totalIncome > 0 ? (posIncome / totalIncome) * 100 : 0 },
+        { category: 'Order Income', amount: orderIncome, percentage: totalIncome > 0 ? (orderIncome / totalIncome) * 100 : 0 },
+        { category: 'Purchases', amount: totalExpenses, percentage: totalExpenses > 0 ? 100 : 0 },
+      ].filter(c => c.amount > 0);
 
       return {
         totalIncome,
@@ -158,25 +189,11 @@ class FinancialService {
   }
 
   async deleteTransaction(transactionId: string): Promise<boolean> {
-    try {
-      // Since the table doesn't exist, return false
-      console.warn('financial_transactions table not available');
-      return false;
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-      return false;
-    }
+    return false;
   }
 
   async updateTransaction(transactionId: string, updates: Partial<FinancialTransaction>): Promise<FinancialTransaction | null> {
-    try {
-      // Since the table doesn't exist, return null
-      console.warn('financial_transactions table not available');
-      return null;
-    } catch (error) {
-      console.error('Error updating transaction:', error);
-      return null;
-    }
+    return null;
   }
 }
 

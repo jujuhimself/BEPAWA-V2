@@ -28,12 +28,20 @@ const PharmacyFinder = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Fetch real pharmacies from Supabase
   useEffect(() => {
     const fetchPharmacies = async () => {
       setIsLoading(true);
       try {
-        // Query only real pharmacies: must have pharmacy_name set (staff never have this)
+        // Step 1: Get all staff user_ids so we can exclude them
+        const { data: staffRows } = await supabase
+          .from('staff_members')
+          .select('user_id')
+          .eq('is_active', true)
+          .not('user_id', 'is', null);
+
+        const staffUserIds = new Set((staffRows || []).map((s: any) => s.user_id));
+
+        // Step 2: Query approved retail profiles with pharmacy_name
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -41,12 +49,14 @@ const PharmacyFinder = () => {
           .eq('is_approved', true)
           .not('pharmacy_name', 'is', null)
           .neq('pharmacy_name', '')
-          .limit(50);
+          .limit(100);
 
         if (error) throw error;
 
-        // Map to Pharmacy interface - all results are guaranteed real pharmacies
-        const mappedPharmacies: Pharmacy[] = (data || []).map((profile: any) => ({
+        // Step 3: Filter out any profile whose id is a staff user_id
+        const realPharmacies = (data || []).filter((p: any) => !staffUserIds.has(p.id));
+
+        const mappedPharmacies: Pharmacy[] = realPharmacies.map((profile: any) => ({
           id: profile.id,
           name: profile.pharmacy_name || profile.business_name || profile.name || 'Pharmacy',
           address: profile.address || `${profile.city || ''}, ${profile.region || 'Tanzania'}`.trim().replace(/^,\s*/, ''),
@@ -61,20 +71,7 @@ const PharmacyFinder = () => {
         setPharmacies(mappedPharmacies);
       } catch (error) {
         console.error('Error fetching pharmacies:', error);
-        // Fallback to sample data if fetch fails
-        setPharmacies([
-          {
-            id: "sample-1",
-            name: "City Pharmacy",
-            address: "Kisutu Street, Dar es Salaam",
-            phone: "+255 22 211 3456",
-            rating: 4.8,
-            distance: "0.5 km",
-            isOpen: true,
-            operatingHours: "8:00 AM - 10:00 PM",
-            services: ["Prescription", "OTC Medicines", "Consultation", "Delivery"]
-          },
-        ]);
+        setPharmacies([]);
       } finally {
         setIsLoading(false);
       }
@@ -105,7 +102,6 @@ const PharmacyFinder = () => {
   };
 
   const handleViewProducts = (pharmacyId: string) => {
-    // Navigate to the pharmacy store page
     navigate(`/pharmacy-store/${pharmacyId}`);
   };
 
@@ -143,7 +139,6 @@ const PharmacyFinder = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Search Pharmacies */}
         <div className="space-y-2">
           <Input
             placeholder="Search pharmacies by name, address, or services..."
@@ -168,7 +163,6 @@ const PharmacyFinder = () => {
           </div>
         </div>
 
-        {/* Empty State */}
         {pharmacies.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             <MapPin className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -177,7 +171,6 @@ const PharmacyFinder = () => {
           </div>
         )}
 
-        {/* Pharmacy List */}
         <div className="space-y-4">
           {pharmacies
             .filter(p => {
@@ -209,7 +202,6 @@ const PharmacyFinder = () => {
                   </div>
                 </div>
 
-                {/* Operating Hours & Status */}
                 <div className="flex items-center gap-2 mb-3">
                   <Badge variant={pharmacy.isOpen ? "default" : "secondary"}>
                     <Clock className="h-3 w-3 mr-1" />
@@ -218,7 +210,6 @@ const PharmacyFinder = () => {
                   <span className="text-sm text-muted-foreground">{pharmacy.operatingHours}</span>
                 </div>
 
-                {/* Services */}
                 <div className="mb-4">
                   <p className="text-sm font-medium mb-2">Services:</p>
                   <div className="flex flex-wrap gap-1">
@@ -230,7 +221,6 @@ const PharmacyFinder = () => {
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-2">
                   <Button 
                     size="sm" 
