@@ -25,7 +25,7 @@ interface CartItem extends Product {
   total: number;
 }
 
-interface Receipt {
+interface ReceiptData {
   id: string;
   items: CartItem[];
   total: number;
@@ -45,7 +45,7 @@ const EnhancedPOS = () => {
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [showReceipt, setShowReceipt] = useState(false);
-  const [currentReceipt, setCurrentReceipt] = useState<Receipt | null>(null);
+  const [currentReceipt, setCurrentReceipt] = useState<ReceiptData | null>(null);
   const [staffName, setStaffName] = useState('');
 
   useEffect(() => {
@@ -62,15 +62,17 @@ const EnhancedPOS = () => {
     );
   }, [searchTerm, products]);
 
+  // Use authUserId (the actual logged-in person) for name lookup, not the org id
   useEffect(() => {
-    if (user?.id) {
+    if (user) {
+      const lookupId = user.authUserId || user.id;
       supabase
         .from('profiles')
         .select('name, email')
-        .eq('id', user.id)
+        .eq('id', lookupId)
         .single()
         .then(({ data }) => {
-          setStaffName(data?.name || data?.email || user.id);
+          setStaffName(data?.name || data?.email || 'Staff');
         });
     }
   }, [user]);
@@ -79,7 +81,7 @@ const EnhancedPOS = () => {
     if (!user) return;
 
     try {
-      // Staff users operate as their employer (user.id is already the employer's id)
+      // user.id is the organization id (employer for staff)
       const ownerId = user.id;
       
       const { data, error } = await supabase
@@ -185,8 +187,7 @@ const EnhancedPOS = () => {
     }
 
     try {
-      // Create POS sale record - user.id is employer id for staff
-      const ownerId = user.id;
+      const ownerId = user.id; // org id
       const saleData = {
         user_id: ownerId,
         total_amount: getCartTotal(),
@@ -203,9 +204,7 @@ const EnhancedPOS = () => {
 
       if (saleError) throw saleError;
 
-      // Create sale items and update inventory
       for (const item of cart) {
-        // Add sale item
         await supabase
           .from('pos_sale_items')
           .insert({
@@ -216,7 +215,6 @@ const EnhancedPOS = () => {
             total_price: item.total
           });
 
-        // Update product stock
         const { error: stockError } = await supabase
           .from('products')
           .update({ stock: item.stock - item.quantity })
@@ -224,7 +222,6 @@ const EnhancedPOS = () => {
 
         if (stockError) throw stockError;
 
-        // Create inventory movement
         await supabase
           .from('inventory_movements')
           .insert({
@@ -232,13 +229,12 @@ const EnhancedPOS = () => {
             product_id: item.id,
             movement_type: 'out',
             quantity: item.quantity,
-            reason: `POS Sale${user.isStaff ? ` (by staff: ${staffName})` : ''}`,
+            reason: `POS Sale (by: ${staffName})`,
             created_by: ownerId
           });
       }
 
-      // Generate receipt
-      const receipt: Receipt = {
+      const receipt: ReceiptData = {
         id: sale.id,
         items: cart,
         total: getCartTotal(),
@@ -251,12 +247,10 @@ const EnhancedPOS = () => {
       setCurrentReceipt(receipt);
       setShowReceipt(true);
 
-      // Clear cart and form
       setCart([]);
       setCustomerName("");
       setPaymentMethod("cash");
 
-      // Refresh products to update stock levels
       fetchProducts();
 
       toast({
@@ -297,7 +291,7 @@ const EnhancedPOS = () => {
             <p>Date: ${currentReceipt.timestamp}</p>
             <p>Receipt ID: ${currentReceipt.id}</p>
             ${currentReceipt.customer_name ? `<p>Customer: ${currentReceipt.customer_name}</p>` : ''}
-            <p>Staff: ${currentReceipt.staff_name}</p>
+            <p>Served by: ${currentReceipt.staff_name}</p>
           </div>
           <div class="items">
             ${currentReceipt.items.map(item => `
@@ -514,7 +508,7 @@ const EnhancedPOS = () => {
                 ) : (
                   <p className="text-sm text-gray-600">Customer: Walk-in</p>
                 )}
-                <p className="text-sm text-gray-600">Staff: {currentReceipt.staff_name}</p>
+                <p className="text-sm text-gray-600">Served by: {currentReceipt.staff_name}</p>
               </div>
 
               <Table>
