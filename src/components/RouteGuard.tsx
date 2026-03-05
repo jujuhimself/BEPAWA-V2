@@ -6,31 +6,67 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { logError } from '@/utils/logger';
 
-// Maps route paths to staff permission keys
-const ROUTE_PERMISSION_MAP: Record<string, string> = {
-  '/pos': 'pos',
-  '/retail/pos': 'pos',
-  '/wholesale/pos': 'pos',
-  '/inventory-management': 'inventory',
-  '/inventory-dashboard': 'inventory',
-  '/wholesale/inventory': 'inventory',
-  '/catalog': 'inventory',
-  '/orders': 'orders',
-  '/wholesale-ordering': 'orders',
-  '/wholesale/retailer-orders': 'orders',
-  '/wholesale/purchase-orders': 'orders',
-  '/cart': 'orders',
-  '/business-center': 'business_tools',
-  '/business-tools': 'business_tools',
-  '/credit-request': 'credit_crm',
-  '/credit-management': 'credit_crm',
-  '/wholesale/business-tools/credit': 'credit_crm',
-  '/wholesale/retailers': 'credit_crm',
-  '/audit-reports': 'audit',
-  '/retail/audit': 'audit',
-  '/wholesale/audit': 'audit',
-  '/analytics': 'analytics',
-};
+// Maps route prefixes to staff permission keys
+// Order matters: more specific prefixes should come first
+const ROUTE_PERMISSION_PREFIXES: Array<{ prefix: string; permission: string }> = [
+  // POS
+  { prefix: '/pos', permission: 'pos' },
+  { prefix: '/retail/pos', permission: 'pos' },
+  { prefix: '/retail/advanced-pos', permission: 'pos' },
+  { prefix: '/wholesale/pos', permission: 'pos' },
+  { prefix: '/wholesale/advanced-pos', permission: 'pos' },
+  // Inventory
+  { prefix: '/inventory', permission: 'inventory' },
+  { prefix: '/catalog', permission: 'inventory' },
+  { prefix: '/wholesale/inventory', permission: 'inventory' },
+  { prefix: '/retail/inventory', permission: 'inventory' },
+  { prefix: '/products', permission: 'inventory' },
+  { prefix: '/suppliers', permission: 'inventory' },
+  { prefix: '/purchase-orders', permission: 'inventory' },
+  { prefix: '/retail/purchase-orders', permission: 'inventory' },
+  { prefix: '/wholesale/purchase-orders', permission: 'inventory' },
+  { prefix: '/retail/forecast', permission: 'inventory' },
+  { prefix: '/wholesale/forecast', permission: 'inventory' },
+  { prefix: '/pharmacy/forecast', permission: 'inventory' },
+  { prefix: '/retail/adjustment', permission: 'inventory' },
+  { prefix: '/wholesale/adjustment', permission: 'inventory' },
+  // Orders
+  { prefix: '/orders', permission: 'orders' },
+  { prefix: '/wholesale-ordering', permission: 'orders' },
+  { prefix: '/wholesale/retailer-orders', permission: 'orders' },
+  { prefix: '/cart', permission: 'orders' },
+  { prefix: '/my-orders', permission: 'orders' },
+  // Business tools
+  { prefix: '/business-center', permission: 'business_tools' },
+  { prefix: '/business-tools', permission: 'business_tools' },
+  { prefix: '/retail/business-tools', permission: 'business_tools' },
+  { prefix: '/wholesale/business-tools', permission: 'business_tools' },
+  // Credit/CRM
+  { prefix: '/credit', permission: 'credit_crm' },
+  { prefix: '/wholesale/retailers', permission: 'credit_crm' },
+  { prefix: '/wholesale/credit', permission: 'credit_crm' },
+  { prefix: '/retail/credit', permission: 'credit_crm' },
+  // Audit
+  { prefix: '/audit', permission: 'audit' },
+  { prefix: '/retail/audit', permission: 'audit' },
+  { prefix: '/wholesale/audit', permission: 'audit' },
+  // Analytics
+  { prefix: '/analytics', permission: 'analytics' },
+  // Staff management
+  { prefix: '/retail/staff', permission: 'business_tools' },
+  { prefix: '/wholesale/staff', permission: 'business_tools' },
+  // Reporting
+  { prefix: '/retail/reporting', permission: 'analytics' },
+];
+
+function getRequiredPermission(pathname: string): string | null {
+  for (const entry of ROUTE_PERMISSION_PREFIXES) {
+    if (pathname === entry.prefix || pathname.startsWith(entry.prefix + '/')) {
+      return entry.permission;
+    }
+  }
+  return null;
+}
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -62,10 +98,10 @@ const RouteGuard: React.FC<RouteGuardProps> = ({
           return;
         }
 
-        // Staff permission enforcement at route level
+        // Staff permission enforcement at route level (prefix-based)
         if (user.isStaff && user.staffInfo?.permissions) {
           const currentPath = location.pathname;
-          const requiredPermission = ROUTE_PERMISSION_MAP[currentPath];
+          const requiredPermission = getRequiredPermission(currentPath);
           
           if (requiredPermission && !user.staffInfo.permissions[requiredPermission]) {
             setError('You do not have permission to access this section. Contact your employer to update your permissions.');
