@@ -8,12 +8,12 @@ export const useProducts = () => {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['products', user?.role],
+    queryKey: ['products', user?.id, user?.authUserId, user?.role],
     queryFn: () => inventoryService.getProducts(user?.role),
     enabled: !!user,
-    staleTime: 1000 * 60 * 2, // 2 minutes - prevents refetching on every focus
-    gcTime: 1000 * 60 * 10, // 10 minutes cache
-    refetchOnWindowFocus: false,
+    staleTime: 1000 * 30, // 30 seconds for faster updates
+    gcTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
   });
 };
 

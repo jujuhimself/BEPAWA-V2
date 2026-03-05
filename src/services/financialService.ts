@@ -70,12 +70,21 @@ class FinancialService {
 
       const { data: posSales } = await posSalesQuery;
 
-      // Fetch orders where this user is the pharmacy (incoming orders = income)
+      // Fetch orders where this user is the pharmacy/wholesaler (incoming orders = income)
+      // Check both pharmacy_id and wholesaler_id for role-agnostic support
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      const orgColumn = userProfile?.role === 'wholesale' ? 'wholesaler_id' : 'pharmacy_id';
+      
       let ordersQuery = supabase
         .from('orders')
         .select('total_amount, created_at, status')
-        .eq('pharmacy_id', userId)
-        .in('status', ['delivered', 'completed', 'paid']);
+        .eq(orgColumn, userId)
+        .in('status', ['delivered', 'completed', 'paid', 'delivered_and_paid']);
 
       if (dateRange) {
         ordersQuery = ordersQuery
@@ -85,12 +94,12 @@ class FinancialService {
 
       const { data: orders } = await ordersQuery;
 
-      // Fetch purchase orders placed by this user (expenses)
+      // Fetch purchase orders as expenses (from purchase_orders table)
       let purchaseQuery = supabase
-        .from('orders')
+        .from('purchase_orders')
         .select('total_amount, created_at, status')
         .eq('user_id', userId)
-        .in('status', ['delivered', 'completed', 'paid']);
+        .in('status', ['received', 'completed', 'delivered']);
 
       if (dateRange) {
         purchaseQuery = purchaseQuery

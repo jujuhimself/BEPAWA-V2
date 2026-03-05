@@ -183,7 +183,7 @@ export default function WholesalePOS() {
     try {
       const totalAmount = getCartTotal();
       
-      // Create the sale
+      // Create the sale - user.id is org id, authUserId is the actual staff/user
       const saleData = await posService.createSale(
         {
           user_id: user.id,
@@ -191,7 +191,8 @@ export default function WholesalePOS() {
           total_amount: totalAmount,
           payment_method: method,
           customer_name: customerName || undefined,
-        },
+          ...(user.isStaff ? { sold_by_user_id: user.authUserId } : {}),
+        } as any,
         cart.map(item => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -246,11 +247,15 @@ export default function WholesalePOS() {
 
   useEffect(() => {
     if (sales.length > 0) {
-      const userIds = Array.from(new Set(sales.map(s => s.user_id)));
+      const allIds = new Set<string>();
+      sales.forEach(s => {
+        allIds.add(s.user_id);
+        if ((s as any).sold_by_user_id) allIds.add((s as any).sold_by_user_id);
+      });
       supabase
         .from('profiles')
         .select('id, name, email')
-        .in('id', userIds)
+        .in('id', Array.from(allIds))
         .then(({ data }) => {
           const map: Record<string, string> = {};
           (data || []).forEach((p: any) => {
@@ -446,7 +451,7 @@ export default function WholesalePOS() {
                     <tr key={sale.id}>
                       <td className="px-4 py-2 whitespace-nowrap">{new Date(sale.sale_date).toLocaleString()}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{sale.customer_name || 'Walk-in'}</td>
-                      <td className="px-4 py-2 whitespace-nowrap">{userProfiles[sale.user_id] || sale.user_id}</td>
+                      <td className="px-4 py-2 whitespace-nowrap">{userProfiles[(sale as any).sold_by_user_id || sale.user_id] || sale.user_id}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{Number(sale.total_amount).toLocaleString('en-TZ', { style: 'currency', currency: 'TZS' })}</td>
                       <td className="px-4 py-2 whitespace-nowrap">{sale.payment_method.charAt(0).toUpperCase() + sale.payment_method.slice(1)}</td>
                       <td className="px-4 py-2 whitespace-nowrap font-mono text-xs">{sale.id}</td>

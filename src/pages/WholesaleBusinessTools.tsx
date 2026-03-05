@@ -145,7 +145,7 @@ const WholesaleBusinessTools = () => {
               })}
             </div>
 
-            {/* Quick Stats */}
+            {/* Quick Stats - Live Data */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
               <Card>
                 <CardContent className="p-4">
@@ -153,8 +153,12 @@ const WholesaleBusinessTools = () => {
                     <TrendingUp className="h-4 w-4 text-green-500" />
                     <span className="text-sm font-medium">Total Revenue</span>
                   </div>
-                  <p className="text-2xl font-bold text-green-600">TZS 12.5M</p>
-                  <p className="text-xs text-gray-500">+15% from last month</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <>
+                      <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalRevenue)}</p>
+                      <p className="text-xs text-muted-foreground">{stats.revenueGrowth >= 0 ? '+' : ''}{stats.revenueGrowth.toFixed(1)}% from last month</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -164,7 +168,9 @@ const WholesaleBusinessTools = () => {
                     <ShoppingCart className="h-4 w-4 text-blue-500" />
                     <span className="text-sm font-medium">Active Orders</span>
                   </div>
-                  <p className="text-2xl font-bold text-blue-600">47</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <p className="text-2xl font-bold text-blue-600">{stats.activeOrders}</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -174,8 +180,9 @@ const WholesaleBusinessTools = () => {
                     <Users className="h-4 w-4 text-purple-500" />
                     <span className="text-sm font-medium">Retailer Partners</span>
                   </div>
-                  <p className="text-2xl font-bold text-purple-600">156</p>
-                  <p className="text-xs text-gray-500">+3 this week</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <p className="text-2xl font-bold text-purple-600">{stats.retailerPartners}</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -185,8 +192,12 @@ const WholesaleBusinessTools = () => {
                     <Package className="h-4 w-4 text-orange-500" />
                     <span className="text-sm font-medium">Low Stock Items</span>
                   </div>
-                  <p className="text-2xl font-bold text-orange-600">12</p>
-                  <p className="text-xs text-gray-500">Need reordering</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <>
+                      <p className="text-2xl font-bold text-orange-600">{stats.lowStockItems}</p>
+                      <p className="text-xs text-muted-foreground">Need reordering</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -18,10 +18,21 @@ export interface AuditLogEntry {
 export interface AuditLog extends AuditLogEntry {}
 
 async function getOrgIdsForUser(userId: string): Promise<{ wholesaler_id?: string; retailer_id?: string }> {
+  // First check if user is staff - if so, use employer's id for org scoping
+  const { data: staffLink } = await supabase
+    .from('staff_members')
+    .select('pharmacy_id')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  const orgId = staffLink?.pharmacy_id || userId;
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, role')
-    .eq('id', userId)
+    .eq('id', orgId)
     .single();
   if (!profile) return {};
   if (profile.role === 'wholesale') {

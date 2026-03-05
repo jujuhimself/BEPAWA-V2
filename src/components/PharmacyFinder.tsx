@@ -32,29 +32,20 @@ const PharmacyFinder = () => {
     const fetchPharmacies = async () => {
       setIsLoading(true);
       try {
-        // Step 1: Get all staff user_ids so we can exclude them
-        const { data: staffRows } = await supabase
-          .from('staff_members')
-          .select('user_id')
-          .eq('is_active', true)
-          .not('user_id', 'is', null);
-
-        const staffUserIds = new Set((staffRows || []).map((s: any) => s.user_id));
-
-        // Step 2: Query approved retail profiles with pharmacy_name
+        // Query only real pharmacies: retail, approved, has pharmacy_name, NOT staff accounts
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, pharmacy_name, business_name, name, address, phone, city, region, operating_hours, latitude, longitude')
           .eq('role', 'retail')
           .eq('is_approved', true)
+          .eq('is_staff_account', false)
           .not('pharmacy_name', 'is', null)
           .neq('pharmacy_name', '')
           .limit(100);
 
         if (error) throw error;
 
-        // Step 3: Filter out any profile whose id is a staff user_id
-        const realPharmacies = (data || []).filter((p: any) => !staffUserIds.has(p.id));
+        const realPharmacies = data || [];
 
         const mappedPharmacies: Pharmacy[] = realPharmacies.map((profile: any) => ({
           id: profile.id,
