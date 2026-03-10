@@ -359,7 +359,7 @@ const PublicCatalog = () => {
     }
 
     try {
-      console.log('Starting checkout for user:', user.id);
+      console.log('Starting checkout for user:', actorUserId);
       console.log('Cart items:', cartItems);
       // Check if cart order exists
       const { data: existingCart, error: cartError } = await supabase
