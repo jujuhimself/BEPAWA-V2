@@ -125,13 +125,13 @@ const PublicCatalog = () => {
 
   useEffect(() => {
     const fetchCartItems = async () => {
-      if (!user) return;
+      if (!user || !actorUserId) return;
 
       try {
         const { data, error } = await supabase
           .from('orders')
           .select('items')
-          .eq('user_id', user.id)
+          .eq('user_id', actorUserId)
           .eq('status', 'cart')
           .eq('role', user.role)
           .maybeSingle();
@@ -153,10 +153,10 @@ const PublicCatalog = () => {
       }
     };
 
-    if (user) {
+    if (user && actorUserId) {
       fetchCartItems();
     }
-  }, [user]);
+  }, [user, actorUserId]);
 
   const addToCart = async (product: Product) => {
     if (!user) {

@@ -67,6 +67,7 @@ const Cart = () => {
   const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   
   const createCODOrder = useCreateCODOrder();
+  const actorUserId = user?.authUserId || user?.id;
 
   useEffect(() => {
     fetchCart();
