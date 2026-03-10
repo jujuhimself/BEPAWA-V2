@@ -42,20 +42,14 @@ const PharmacyFinder = () => {
         const staffIds = (staffRows || []).map((s: any) => s.user_id).filter(Boolean);
 
         // Query only real pharmacies: retail, approved, has pharmacy_name, exclude staff
-        let query = supabase
+        const { data, error } = await (supabase
           .from('profiles')
-          .select('id, pharmacy_name, business_name, name, address, phone, city, region, operating_hours, latitude, longitude')
-          .eq('role' as any, 'retail')
-          .eq('is_approved' as any, true)
+          .select('id, pharmacy_name, business_name, name, address, phone, city, region, operating_hours, latitude, longitude') as any)
+          .eq('role', 'retail')
+          .eq('is_approved', true)
           .not('pharmacy_name', 'is', null)
           .neq('pharmacy_name', '')
           .limit(100);
-
-        if (staffIds.length > 0) {
-          query = query.not('id', 'in', `(${staffIds.join(',')})`);
-        }
-
-        const { data, error } = await query;
 
         if (error) throw error;
 
