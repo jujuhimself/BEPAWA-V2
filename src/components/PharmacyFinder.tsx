@@ -32,16 +32,14 @@ const PharmacyFinder = () => {
     const fetchPharmacies = async () => {
       setIsLoading(true);
       try {
-        // First get staff user_ids to exclude them
-        const { data: staffRows } = await supabase
-          .from('staff_members')
-          .select('user_id')
-          .eq('is_active', true)
-          .not('user_id', 'is', null);
+        // Get active staff ids via SECURITY DEFINER RPC (bypasses staff_members RLS)
+        const { data: staffRows } = await (supabase.rpc('get_active_staff_user_ids' as any) as any);
 
-        const staffIds = (staffRows || []).map((s: any) => s.user_id).filter(Boolean);
+        const staffIds = (staffRows || [])
+          .map((row: any) => (typeof row === 'string' ? row : row?.get_active_staff_user_ids || row?.user_id))
+          .filter(Boolean);
 
-        // Query only real pharmacies: retail, approved, has pharmacy_name, exclude staff
+        // Query only real pharmacies: retail, approved, has pharmacy_name
         const { data, error } = await (supabase
           .from('profiles')
           .select('id, pharmacy_name, business_name, name, address, phone, city, region, operating_hours, latitude, longitude') as any)

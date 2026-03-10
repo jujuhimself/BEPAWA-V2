@@ -73,6 +73,8 @@ const PharmacyStore = () => {
       return;
     }
 
+    const actorUserId = user.authUserId || user.id;
+
     setAddingToCart(product.id);
     
     try {
@@ -80,7 +82,7 @@ const PharmacyStore = () => {
       const { data: existingCart, error: fetchError } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .maybeSingle();
@@ -131,7 +133,7 @@ const PharmacyStore = () => {
         const { error: createError } = await supabase
           .from('orders')
           .insert([{
-            user_id: user.id,
+            user_id: actorUserId,
             order_number: orderNumber,
             order_type: 'retail',
             status: 'cart',

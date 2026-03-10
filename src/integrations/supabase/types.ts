@@ -3757,6 +3757,7 @@ export type Database = {
     }
     Functions: {
       fulfill_order_stock: { Args: { p_order_id: string }; Returns: undefined }
+      get_active_staff_user_ids: { Args: never; Returns: string[] }
       get_current_user_role: { Args: never; Returns: string }
       get_orders_by_retailer: {
         Args: { retailer_uuid: string }
