@@ -289,7 +289,7 @@ const PublicCatalog = () => {
             total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             updated_at: new Date().toISOString()
           })
-          .eq('user_id', user.id)
+          .eq('user_id', actorUserId)
           .eq('role', user.role)
           .eq('status', 'cart')
           .select()
