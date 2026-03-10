@@ -215,7 +215,7 @@ const Cart = () => {
     }
 
     createCODOrder.mutate({
-      user_id: user.id,
+      user_id: actorUserId,
       items: cartItems,
       total_amount: getTotalPrice() + getDeliveryFee(),
       delivery_address: deliveryLocation.address,
