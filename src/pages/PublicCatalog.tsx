@@ -314,7 +314,7 @@ const PublicCatalog = () => {
             items: newCartItems,
             total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             updated_at: new Date().toISOString(),
-            order_number: `CART-${user.id}`,
+            order_number: `CART-${actorUserId}`,
           })
           .select()
           .maybeSingle();
