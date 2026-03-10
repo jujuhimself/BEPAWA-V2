@@ -365,7 +365,7 @@ const PublicCatalog = () => {
       const { data: existingCart, error: cartError } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .maybeSingle();
