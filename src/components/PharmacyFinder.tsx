@@ -53,7 +53,7 @@ const PharmacyFinder = () => {
 
         if (error) throw error;
 
-        const realPharmacies = data || [];
+        const realPharmacies = (data || []).filter((p: any) => !staffIds.includes(p.id));
 
         const mappedPharmacies: Pharmacy[] = realPharmacies.map((profile: any) => ({
           id: profile.id,
