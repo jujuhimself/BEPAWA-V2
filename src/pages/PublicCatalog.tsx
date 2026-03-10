@@ -394,7 +394,7 @@ const PublicCatalog = () => {
           order_number: `ORDER-${actorUserId}-${Date.now()}`,
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .select()
