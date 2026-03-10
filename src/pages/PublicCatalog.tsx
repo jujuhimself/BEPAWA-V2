@@ -391,7 +391,7 @@ const PublicCatalog = () => {
           status: 'pending',
           items: cartItems,
           total_amount: cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-          order_number: `ORDER-${user.id}-${Date.now()}`,
+          order_number: `ORDER-${actorUserId}-${Date.now()}`,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
