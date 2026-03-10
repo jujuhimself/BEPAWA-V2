@@ -159,7 +159,7 @@ const PublicCatalog = () => {
   }, [user, actorUserId]);
 
   const addToCart = async (product: Product) => {
-    if (!user) {
+    if (!user || !actorUserId) {
       toast({
         title: "Not authenticated",
         description: "Please log in to add items to your cart",
