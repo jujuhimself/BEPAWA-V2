@@ -81,7 +81,7 @@ const Cart = () => {
       const { data, error } = await supabase
         .from('orders')
         .select('items')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .maybeSingle();
