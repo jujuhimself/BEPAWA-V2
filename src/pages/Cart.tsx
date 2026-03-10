@@ -415,7 +415,7 @@ const Cart = () => {
                                 try {
                                   await new Promise((res) => setTimeout(res, 1200));
                                   const order = await orderService.createPlatformOrder({
-                                    user_id: user.id,
+                                    user_id: actorUserId,
                                     order_type: 'retail',
                                     order_number: undefined,
                                     total_amount: getTotalPrice(),
