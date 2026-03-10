@@ -33,7 +33,7 @@ const PublicCatalog = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const actorUserId = user?.authUserId || user?.id;
+  const actorUserId = user?.authUserId || user?.id || '';
 
   const fetchProducts = async () => {
     try {
