@@ -154,7 +154,7 @@ const Cart = () => {
           total_amount: 0,
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart');
       if (error) throw error;
