@@ -219,7 +219,7 @@ const PublicCatalog = () => {
         const { data: newData, error: insertError } = await supabase
           .from('orders')
           .insert({
-            user_id: user.id,
+            user_id: actorUserId,
             status: 'cart',
             role: user.role,
             items: newCartItems,
