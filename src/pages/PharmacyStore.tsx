@@ -73,6 +73,8 @@ const PharmacyStore = () => {
       return;
     }
 
+    const actorUserId = user.authUserId || user.id;
+
     setAddingToCart(product.id);
     
     try {
@@ -80,7 +82,7 @@ const PharmacyStore = () => {
       const { data: existingCart, error: fetchError } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .maybeSingle();
