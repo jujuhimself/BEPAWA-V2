@@ -272,7 +272,7 @@ const PublicCatalog = () => {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart')
         .maybeSingle();
