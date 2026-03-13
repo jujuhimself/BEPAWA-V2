@@ -1,76 +1,120 @@
 
-Goal: deliver a permanent staff/permissions/data wiring fix by addressing root causes in identity mapping, route enforcement, DB policies, and mock/static dashboards.
+Goal: restore production-safe, accurate pharmacy business data without breaking existing services, and permanently stop staff accounts from appearing as pharmacies.
 
-1) Root-cause summary (from code + DB)
-- Staff identity split is inconsistent: `user.id` is treated as org id in many places, but `orders.user_id` and `audit_logs.user_id` are FK/RLS-bound to `auth.uid()` (actor). This causes cart/add-order failures and audit insert failures.
-- Route permission enforcement is partial:
-  - `RouteGuard` uses exact-path map (misses many routes like `/audit`, subroutes, etc.).
-  - `/analytics` is currently unguarded in `src/routes/AppRoutes.tsx`.
-- POS attribution fix was applied in `EnhancedPOS`, but active routes use `RetailPos.tsx` / `WholesalePOS.tsx`, so staff name still resolves to owner/org id.
-- “Staff excluded from pharmacy finder” is currently done by querying `staff_members` client-side, but RLS prevents individual users from seeing all staff rows, so exclusion fails.
-- Staff duplicates exist in DB (`staff_members` has multiple active rows for same user/email), creating random permission outcomes.
-- Business/analytics “zero” issues come from:
-  - wrong role/org filters in some queries,
-  - status mismatches (e.g. `delivered_and_paid` not counted),
-  - wholesale business tools page still contains hardcoded metrics.
+What I verified (root causes)
+1) Staff still appears in Find Pharmacies because /pharmacy-directory uses src/pages/PharmacyDirectory.tsx, not PharmacyFinder.tsx.  
+   - PharmacyDirectory currently queries profiles where role='retail' only, with no staff exclusion.
+2) Low stock + expiring are mixed across pharmacies because inventoryService.getLowStockProducts/getExpiringProducts query all products with no org filter.
+3) Business analytics showing 0 is a combination of:
+   - Frontend queries that rely on provider fields (pharmacy_id/wholesaler_id) while many orders don’t consistently set them.
+   - RLS on orders only allows user_id=auth.uid(), so pharmacy/wholesale provider views can’t read customer orders scoped by pharmacy_id/wholesaler_id.
+   - AnalyticsDashboard revenue currently focuses on orders and underuses POS revenue for KPI totals.
+4) “Add transaction” is not wired:
+   - financialService.getTransactions returns [] and addTransaction returns null (stubbed).
+   - financial_transactions table is absent.
+5) “Recent reports downloadable” is mock:
+   - InventoryReports renders hardcoded recent reports and fake toasts.
+   - reportingService expects storage bucket "reports" and generated_reports records, but no live wiring from InventoryReports.
+6) Cart/order conflict still occurs in some flows because actor-vs-employer identity usage is inconsistent across pages/services.
+7) Current build has a stability issue: src/config/subscription.ts uses process.env in browser code (TS error).
 
-2) Permanent backend/data hardening (migrations)
-- Add `profiles.is_staff_account boolean default false not null`.
-- Backfill `is_staff_account=true` for all `profiles.id` present in active `staff_members.user_id`.
-- Update `handle_new_user` + staff-link updates to always maintain `is_staff_account=true` for staff.
-- Add dedupe + guardrails for staff rows:
-  - cleanup migration keeping latest active row per `(pharmacy_id, lower(email))` and per `(pharmacy_id, user_id)`.
-  - unique partial indexes to prevent duplicate active assignments.
-- (Optional but recommended) add `pos_sales.sold_by_user_id uuid` for true staff attribution without overloading org `user_id`; backfill where possible.
-- Update RLS only where required (minimal):
-  - keep `orders/audit_logs user_id = auth.uid()` model,
-  - allow org-scoped reads via existing org columns (`pharmacy_id`, `wholesaler_id`, `retailer_id`) without weakening auth checks.
+Implementation plan (safe phased rollout)
+Phase 0 — Stabilize build first (no behavior change)
+- Fix src/config/subscription.ts to use import.meta.env.DEV (or Vite env) instead of process.env.
+- Keep tsconfig clean (no loosening needed for this).
 
-3) Identity model standardization in app code
-- Keep:
-  - `user.authUserId` = actor id (always auth user)
-  - `user.id` = organization id for staff, own id for non-staff
-- Enforce rule:
-  - Any table with `user_id` tied to auth/RLS/FK uses `authUserId`.
-  - Organization scoping uses `pharmacy_id/wholesaler_id/profile_id` (not `user_id`).
-- Apply to:
-  - `PublicCatalog.tsx`, `Cart.tsx`, `orderService.ts`, `auditService.ts`, POS pages, and any order/cart insert/update path.
+Phase 1 — Permanent staff exclusion from pharmacy directory
+- Refactor src/pages/PharmacyDirectory.tsx to use the same exclusion strategy as PharmacyFinder:
+  1) Fetch active staff user IDs via RPC get_active_staff_user_ids().
+  2) Exclude those IDs from profiles query.
+  3) Keep pharmacy-only filters (role retail + approved + valid business name fields).
+- Also update product stock query in PharmacyDirectory to only load products for the filtered pharmacy IDs.
+- Create a shared helper (e.g., src/services/pharmacyDirectoryService.ts) used by both PharmacyDirectory and PharmacyFinder so this doesn’t drift again.
+- Guarantee “no new staff visible” by relying on live staff_members linkage via RPC (not static local state).
 
-4) Staff permissions: full enforcement
-- Replace exact-path map in `RouteGuard.tsx` with robust matching (prefix/segment-based or central route metadata).
-- Create a single permission matrix keyed by route patterns and use it in both:
-  - `RouteGuard` (hard enforcement),
-  - `navigationConfig` (UI visibility).
-- Guard unprotected routes (notably `/analytics`) in `AppRoutes.tsx`.
-- Ensure staff with empty permissions cannot access protected modules even via direct URL.
+Phase 2 — Fix order identity model + cart reliability
+- Standardize a single actor ID source in frontend order/cart flows:
+  - actorUserId = user.authUserId || user.id
+- Apply consistently in all order writes/reads (Cart, PublicCatalog, PharmacyStore, MyOrders, wholesale ordering entry points).
+- For checkout order creation, always set provider columns from cart line items:
+  - pharmacy_id for retail provider orders
+  - wholesaler_id for wholesale provider orders
+- Keep user_id as authenticated actor (to satisfy FK + RLS).
 
-5) POS attribution fix (actual active components)
-- Update `src/pages/retail/RetailPos.tsx` and `src/pages/wholesale/WholesalePOS.tsx`:
-  - write actor attribution from `authUserId` (or `sold_by_user_id` if added),
-  - display staff name from actor profile, not org owner profile.
-- Keep org-level sales aggregation for business reporting via org columns.
+Phase 3 — RLS policy patch for provider analytics/order visibility
+- Add missing SELECT policies on orders so providers can read orders where:
+  - pharmacy_id = auth.uid() OR wholesaler_id = auth.uid()
+  - plus staff viewing employer orders via staff_members mapping.
+- Keep INSERT policy strict (user_id must be auth.uid()) to prevent impersonation.
+- Add/update UPDATE policies only for required provider status transitions, scoped by provider ownership.
+- Validate with sample staff + owner accounts before finalizing.
 
-6) Pharmacy finder permanent fix
-- Stop relying on client-side `staff_members` reads for exclusion.
-- Query only profiles that are true pharmacies:
-  - `role='retail'`, `is_approved=true`, non-empty `pharmacy_name`, and `is_staff_account=false`.
-- Update `PharmacyFinder.tsx` to use this rule only (no staff-members fetch required).
+Phase 4 — Fix mixed inventory metrics (low stock / expiring / dashboard)
+- Update inventoryService:
+  - getLowStockProducts and getExpiringProducts must filter by org ownership (user_id/pharmacy_id/wholesaler_id based on role + staff employer mapping).
+  - Avoid global product scans.
+- Update InventoryDashboard and hooks to use scoped queries only.
+- Reconcile Expiring Soon to ignore null expiry_date and past-deleted records; keep date-window logic deterministic.
 
-7) Business Center / Ops Hub / Analytics completion
-- `BusinessCenter.tsx`: normalize revenue/expense logic by role and status list (`completed`, `paid`, `delivered`, `delivered_and_paid`, etc.).
-- `AnalyticsDashboard.tsx`: include correct org filters and valid statuses; avoid user-id-only assumptions for org views.
-- `WholesaleBusinessTools.tsx`: replace hardcoded overview cards and static lists with live queries (or reuse `AnalyticsDashboard` + `FinancialManagement` components with real hooks).
+Phase 5 — Replace analytics “0” behavior with true live business data
+- Update AnalyticsDashboard KPI aggregation:
+  - Revenue = POS sales + paid/completed provider orders.
+  - Include statuses: completed, paid, delivered, delivered_and_paid.
+  - Keep timeframe filter consistent across orders and POS.
+- Update BusinessCenter monthly metrics to same revenue/status rules.
+- Ensure provider scope uses pharmacy_id/wholesaler_id and staff inherits employer scope.
+- Remove remaining pseudo/random values from analytics-facing cards.
 
-8) Inventory “lag / not refreshing” fixes
-- `useProducts` query key should include identity (`user?.id`, `user?.authUserId`, role), not just role.
-- Reduce over-aggressive stale cache and add targeted invalidations after create/update/delete.
-- Add realtime subscription (products/inventory movements) to update UI without manual refresh.
+Phase 6 — Make Add Transaction actually work
+- DB migration:
+  - Create public.financial_transactions (id, user_id, type, amount, category, description, transaction_date, timestamps).
+  - Enable RLS + owner policies (auth.uid() = user_id).
+- Implement financialService.getTransactions/addTransaction/delete/update against this table.
+- Keep FinancialManagement UI unchanged except now fully live.
 
-9) Verification checklist (must pass before closing)
-- Staff invite -> login -> role/link/permissions correct on first session.
-- Staff can access only assigned modules; direct URL blocked for disallowed routes.
-- Staff cannot appear in Individual Find Pharmacy.
-- Staff cart/order works (no FK/RLS error), audit logs insert succeeds.
-- POS receipt/history shows actual staff identity, not owner.
-- Business Center / Operations Hub / Analytics show non-mock live data.
-- Product add/edit and inventory updates reflect immediately without full page refresh.
+Phase 7 — Make Recent Reports truly downloadable
+- Wire InventoryReports to real report generation path:
+  - Generate report file (CSV first, then PDF/Excel format options incrementally).
+  - Persist metadata in generated_reports.
+  - Store files in reports bucket and save file_path.
+  - Download button pulls actual file from storage/file_path.
+- Replace hardcoded “Recent Reports” array with generated_reports query for current org/user.
+
+Phase 8 — Staff permissions confidence pass
+- Validate RouteGuard + navigation consistency against current permission keys (pos/inventory/orders/business_tools/analytics/credit_crm/audit/alerts).
+- Verify direct URL blocking for disallowed modules (not just hidden nav links).
+
+Technical details (for implementation)
+- Files to update (primary):
+  - src/pages/PharmacyDirectory.tsx
+  - src/components/PharmacyFinder.tsx (align via shared service)
+  - src/pages/Cart.tsx
+  - src/pages/PublicCatalog.tsx
+  - src/pages/PharmacyStore.tsx
+  - src/pages/MyOrders.tsx
+  - src/components/AnalyticsDashboard.tsx
+  - src/pages/BusinessCenter.tsx
+  - src/services/inventoryService.ts
+  - src/services/financialService.ts
+  - src/components/inventory/InventoryReports.tsx
+  - src/services/reportingService.ts
+  - src/config/subscription.ts
+- DB migrations:
+  1) orders RLS provider/staff SELECT policies (and needed UPDATE policies)
+  2) financial_transactions table + RLS
+  3) reports storage access policy support if needed
+- Security constraints respected:
+  - Keep sensitive tables behind RLS.
+  - Keep user_id actor-bound for writes.
+  - No auth schema modifications.
+
+Verification checklist before closing
+1) Staff account does not appear in /pharmacy-directory and individual find-pharmacy views.
+2) New invited staff also never appears in directory.
+3) Staff/owner can add to cart and checkout without FK 409.
+4) Business analytics and Business Center show non-zero real values when POS/orders exist.
+5) Low stock + expiring show only current pharmacy/wholesaler inventory.
+6) Add Transaction creates and displays live entries.
+7) Recent reports download real files.
+8) Staff permission matrix blocks unauthorized route access by direct URL.
+9) Regression pass: product create/edit/upload and other connected services remain operational.
