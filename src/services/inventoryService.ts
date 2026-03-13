@@ -89,76 +89,97 @@ export interface InventoryMovement {
   created_by?: string;
 }
 
+function mapProduct(item: any): Product {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    category: item.category,
+    price: item.sell_price || 0,
+    stock: item.stock,
+    min_stock: item.min_stock_level || 0,
+    max_stock: item.max_stock,
+    buy_price: item.buy_price || 0,
+    sell_price: item.sell_price || 0,
+    requires_prescription: item.requires_prescription,
+    expiry_date: item.expiry_date,
+    last_ordered: item.last_ordered,
+    is_wholesale_product: item.is_wholesale_product,
+    is_retail_product: item.is_retail_product,
+    is_public_product: item.is_public_product,
+    wholesaler_id: item.wholesaler_id,
+    pharmacy_id: item.pharmacy_id,
+    user_id: item.user_id,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    branch_id: item.branch_id,
+    item_type_id: item.item_type_id,
+    sku: item.sku,
+    manufacturer: item.manufacturer,
+    dosage_form: item.dosage_form,
+    strength: item.strength,
+    pack_size: item.pack_size,
+    supplier: item.supplier,
+    batch_number: item.batch_number,
+    status: item.status as Product['status'],
+    image_url: item.image_url
+  };
+}
+
+/** Helper to get the current user's org-scoped product filter */
+async function getOrgProductQuery(baseQuery: any) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return baseQuery;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  // Check if staff — if so, scope to employer
+  const { data: staffRow } = await supabase
+    .from('staff_members')
+    .select('pharmacy_id')
+    .eq('user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  const orgId = staffRow?.pharmacy_id || user.id;
+
+  if (profile?.role === 'wholesale') {
+    return baseQuery.or(`wholesaler_id.eq.${orgId},user_id.eq.${orgId}`);
+  }
+  // retail or default
+  return baseQuery.or(`pharmacy_id.eq.${orgId},user_id.eq.${orgId}`);
+}
+
 class InventoryService {
   async getProducts(userRole?: string): Promise<Product[]> {
     let query = supabase.from('products').select('*');
 
-    // Apply role-based filtering at query level for better performance
     if (userRole === 'individual') {
       query = query.or('is_retail_product.eq.true,is_public_product.eq.true');
     } else if (userRole === 'retail') {
-      // Retail users see wholesale products, public products, and their own products
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const orQuery = `is_wholesale_product.eq.true,is_public_product.eq.true,user_id.eq.${user.id}`;
-        console.log('Retailer product query:', orQuery, 'user.id:', user.id);
         query = query.or(orQuery);
       }
     } else if (userRole === 'wholesale') {
-      // Wholesale users should only see their own products
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         query = query.eq('wholesaler_id', user.id);
-        console.log('Wholesaler product query - wholesaler_id:', user.id);
       }
     }
-    // For other roles (admin, etc.), show all products (no additional filter needed)
 
     query = query.order('name');
-
     const { data, error } = await query;
-
     if (error) {
       console.error('Error fetching products:', error);
       throw error;
     }
-
-    console.log(`Fetched ${data?.length || 0} products for role: ${userRole}`);
-
-    return (data || []).map(item => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      category: item.category,
-      price: item.sell_price || 0,
-      stock: item.stock,
-      min_stock: item.min_stock_level || 0,
-      max_stock: item.max_stock,
-      buy_price: item.buy_price || 0,
-      sell_price: item.sell_price || 0,
-      requires_prescription: item.requires_prescription,
-      expiry_date: item.expiry_date,
-      last_ordered: item.last_ordered,
-      is_wholesale_product: item.is_wholesale_product,
-      is_retail_product: item.is_retail_product,
-      is_public_product: item.is_public_product,
-      wholesaler_id: item.wholesaler_id,
-      pharmacy_id: item.pharmacy_id,
-      user_id: item.user_id,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      branch_id: item.branch_id,
-      item_type_id: item.item_type_id,
-      sku: item.sku,
-      manufacturer: item.manufacturer,
-      dosage_form: item.dosage_form,
-      strength: item.strength,
-      pack_size: item.pack_size,
-      supplier: item.supplier,
-      batch_number: item.batch_number,
-      status: item.status as Product['status'],
-      image_url: item.image_url
-    }));
+    return (data || []).map(mapProduct);
   }
 
   async getProduct(productId: string): Promise<Product | null> {
@@ -167,87 +188,27 @@ class InventoryService {
       .select('*')
       .eq('id', productId)
       .single();
-
-    if (error) {
-      console.error('Error fetching product:', error);
-      return null;
-    }
-
+    if (error) { console.error('Error fetching product:', error); return null; }
     if (!data) return null;
-
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      category: data.category,
-      price: data.sell_price || 0,
-      stock: data.stock,
-      min_stock: data.min_stock_level || 0,
-      max_stock: data.max_stock,
-      buy_price: data.buy_price || 0,
-      sell_price: data.sell_price || 0,
-      requires_prescription: data.requires_prescription,
-      expiry_date: data.expiry_date,
-      last_ordered: data.last_ordered,
-      is_wholesale_product: data.is_wholesale_product,
-      is_retail_product: data.is_retail_product,
-      is_public_product: data.is_public_product,
-      wholesaler_id: data.wholesaler_id,
-      pharmacy_id: data.pharmacy_id,
-      user_id: data.user_id,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      branch_id: data.branch_id,
-      item_type_id: data.item_type_id,
-      sku: data.sku,
-      manufacturer: data.manufacturer,
-      dosage_form: data.dosage_form,
-      strength: data.strength,
-      pack_size: data.pack_size,
-      supplier: data.supplier,
-      batch_number: data.batch_number,
-      status: data.status as Product['status'],
-      image_url: data.image_url
-    };
+    return mapProduct(data);
   }
 
   async createProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> {
-    // Get user role to set appropriate visibility flags
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('You must be signed in to add a product. Please log in again.');
-    }
+    if (!user) throw new Error('You must be signed in to add a product.');
+
     let insertObj: any = {
-      name: product.name,
-      description: product.description,
-      category: product.category,
-      stock: product.stock,
-      min_stock_level: product.min_stock,
-      max_stock: product.max_stock,
-      buy_price: product.buy_price,
-      sell_price: product.sell_price,
-      requires_prescription: product.requires_prescription,
-      expiry_date: product.expiry_date,
-      branch_id: product.branch_id,
-      sku: product.sku,
-      manufacturer: product.manufacturer,
-      dosage_form: product.dosage_form,
-      strength: product.strength,
-      pack_size: product.pack_size,
-      supplier: product.supplier,
-      batch_number: product.batch_number,
-      status: product.status,
-      image_url: product.image_url,
-      user_id: user.id // Always set to current user
+      name: product.name, description: product.description, category: product.category,
+      stock: product.stock, min_stock_level: product.min_stock, max_stock: product.max_stock,
+      buy_price: product.buy_price, sell_price: product.sell_price,
+      requires_prescription: product.requires_prescription, expiry_date: product.expiry_date,
+      branch_id: product.branch_id, sku: product.sku, manufacturer: product.manufacturer,
+      dosage_form: product.dosage_form, strength: product.strength, pack_size: product.pack_size,
+      supplier: product.supplier, batch_number: product.batch_number,
+      status: product.status, image_url: product.image_url, user_id: user.id
     };
 
-    // Fetch user profile to determine role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
     if (profile?.role === 'wholesale') {
       insertObj.is_wholesale_product = true;
       insertObj.is_retail_product = false;
@@ -259,370 +220,130 @@ class InventoryService {
       insertObj.is_public_product = !!product.is_public_product;
     }
 
-    const { data, error } = await supabase
-      .from('products')
-      .insert(insertObj)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating product:', error);
-      throw error;
-    }
-
-    return {
-      ...product,
-      id: data.id,
-      created_at: data.created_at,
-      updated_at: data.updated_at
-    };
+    const { data, error } = await supabase.from('products').insert(insertObj).select().single();
+    if (error) { console.error('Error creating product:', error); throw error; }
+    return { ...product, id: data.id, created_at: data.created_at, updated_at: data.updated_at };
   }
 
   async updateProduct(productId: string, updates: Partial<Product>): Promise<void> {
     const { error } = await supabase
       .from('products')
       .update({
-        name: updates.name,
-        description: updates.description,
-        category: updates.category,
-        stock: updates.stock,
-        min_stock_level: updates.min_stock,
-        max_stock: updates.max_stock,
-        buy_price: updates.buy_price,
-        sell_price: updates.sell_price,
-        requires_prescription: updates.requires_prescription,
-        expiry_date: updates.expiry_date,
-        sku: updates.sku,
-        manufacturer: updates.manufacturer,
-        dosage_form: updates.dosage_form,
-        strength: updates.strength,
-        pack_size: updates.pack_size,
-        supplier: updates.supplier,
-        batch_number: updates.batch_number,
-        status: updates.status,
-        image_url: updates.image_url
+        name: updates.name, description: updates.description, category: updates.category,
+        stock: updates.stock, min_stock_level: updates.min_stock, max_stock: updates.max_stock,
+        buy_price: updates.buy_price, sell_price: updates.sell_price,
+        requires_prescription: updates.requires_prescription, expiry_date: updates.expiry_date,
+        sku: updates.sku, manufacturer: updates.manufacturer, dosage_form: updates.dosage_form,
+        strength: updates.strength, pack_size: updates.pack_size, supplier: updates.supplier,
+        batch_number: updates.batch_number, status: updates.status, image_url: updates.image_url
       })
       .eq('id', productId);
-
-    if (error) {
-      console.error('Error updating product:', error);
-      throw error;
-    }
+    if (error) { console.error('Error updating product:', error); throw error; }
   }
 
   async deleteProduct(productId: string): Promise<void> {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', productId);
-
-    if (error) {
-      console.error('Error deleting product:', error);
-      throw error;
-    }
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) { console.error('Error deleting product:', error); throw error; }
   }
 
   async updateStock(productId: string, newStock: number, reason?: string): Promise<void> {
-    const { error } = await supabase
-      .from('products')
-      .update({ stock: newStock })
-      .eq('id', productId);
-
-    if (error) {
-      console.error('Error updating stock:', error);
-      throw error;
-    }
+    const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', productId);
+    if (error) { console.error('Error updating stock:', error); throw error; }
   }
 
   async getInventoryMovements(productId?: string): Promise<InventoryMovement[]> {
-    let query = supabase
-      .from('inventory_movements')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (productId) {
-      query = query.eq('product_id', productId);
-    }
-
+    let query = supabase.from('inventory_movements').select('*').order('created_at', { ascending: false });
+    if (productId) query = query.eq('product_id', productId);
     const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching inventory movements:', error);
-      throw error;
-    }
-
-    return (data || []).map(item => ({
-      ...item,
-      movement_type: item.movement_type as InventoryMovement['movement_type']
-    }));
+    if (error) { console.error('Error fetching inventory movements:', error); throw error; }
+    return (data || []).map(item => ({ ...item, movement_type: item.movement_type as InventoryMovement['movement_type'] }));
   }
 
   async createInventoryMovement(movement: Omit<InventoryMovement, 'id' | 'created_at'>): Promise<InventoryMovement> {
-    const { data, error } = await supabase
-      .from('inventory_movements')
-      .insert(movement)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating inventory movement:', error);
-      throw error;
-    }
-
-    return {
-      ...data,
-      movement_type: data.movement_type as InventoryMovement['movement_type']
-    };
+    const { data, error } = await supabase.from('inventory_movements').insert(movement).select().single();
+    if (error) { console.error('Error creating inventory movement:', error); throw error; }
+    return { ...data, movement_type: data.movement_type as InventoryMovement['movement_type'] };
   }
 
   async getSuppliers(): Promise<Supplier[]> {
-    const { data, error } = await supabase
-      .from('suppliers')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      console.error('Error fetching suppliers:', error);
-      throw error;
-    }
-
+    const { data, error } = await supabase.from('suppliers').select('*').order('name');
+    if (error) { console.error('Error fetching suppliers:', error); throw error; }
     return data || [];
   }
 
   async createSupplier(supplier: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>): Promise<Supplier> {
-    const { data, error } = await supabase
-      .from('suppliers')
-      .insert(supplier)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating supplier:', error);
-      throw error;
-    }
-
+    const { data, error } = await supabase.from('suppliers').insert(supplier).select().single();
+    if (error) { console.error('Error creating supplier:', error); throw error; }
     return data;
   }
 
   async getPurchaseOrders(): Promise<PurchaseOrder[]> {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching purchase orders:', error);
-      throw error;
-    }
-
-    return (data || []).map(item => ({
-      ...item,
-      status: item.status as PurchaseOrder['status']
-    }));
+    const { data, error } = await supabase.from('purchase_orders').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching purchase orders:', error); throw error; }
+    return (data || []).map(item => ({ ...item, status: item.status as PurchaseOrder['status'] }));
   }
 
   async createPurchaseOrder(purchaseOrder: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>): Promise<PurchaseOrder> {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .insert(purchaseOrder)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating purchase order:', error);
-      throw error;
-    }
-
-    return {
-      ...data,
-      status: data.status as PurchaseOrder['status']
-    };
+    const { data, error } = await supabase.from('purchase_orders').insert(purchaseOrder).select().single();
+    if (error) { console.error('Error creating purchase order:', error); throw error; }
+    return { ...data, status: data.status as PurchaseOrder['status'] };
   }
 
   async getPurchaseOrderItems(purchaseOrderId: string): Promise<PurchaseOrderItem[]> {
-    const { data, error } = await supabase
-      .from('purchase_order_items')
-      .select('*')
-      .eq('purchase_order_id', purchaseOrderId)
-      .order('created_at');
-
-    if (error) {
-      console.error('Error fetching purchase order items:', error);
-      throw error;
-    }
-
-    return (data || []).map(item => ({
-      ...item,
-      unit_cost: item.unit_price,
-      total_cost: item.total_price,
-      received_quantity: 0
-    }));
+    const { data, error } = await supabase.from('purchase_order_items').select('*').eq('purchase_order_id', purchaseOrderId).order('created_at');
+    if (error) { console.error('Error fetching purchase order items:', error); throw error; }
+    return (data || []).map(item => ({ ...item, unit_cost: item.unit_price, total_cost: item.total_price, received_quantity: 0 }));
   }
 
   async createPurchaseOrderItem(item: Omit<PurchaseOrderItem, 'id' | 'created_at' | 'unit_cost' | 'total_cost' | 'received_quantity'>): Promise<PurchaseOrderItem> {
-    const { data, error } = await supabase
-      .from('purchase_order_items')
-      .insert(item)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating purchase order item:', error);
-      throw error;
-    }
-
-    return {
-      ...data,
-      unit_cost: data.unit_price,
-      total_cost: data.total_price,
-      received_quantity: 0
-    };
+    const { data, error } = await supabase.from('purchase_order_items').insert(item).select().single();
+    if (error) { console.error('Error creating purchase order item:', error); throw error; }
+    return { ...data, unit_cost: data.unit_price, total_cost: data.total_price, received_quantity: 0 };
   }
 
+  /** Low stock products scoped to the current user's org */
   async getLowStockProducts(): Promise<Product[]> {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .lte('stock', 'min_stock_level')
-      .order('stock');
-
-    if (error) {
-      console.error('Error fetching low stock products:', error);
-      throw error;
-    }
-
-    return (data || []).map(item => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      category: item.category,
-      price: item.sell_price || 0,
-      stock: item.stock,
-      min_stock: item.min_stock_level || 0,
-      max_stock: item.max_stock,
-      buy_price: item.buy_price || 0,
-      sell_price: item.sell_price || 0,
-      requires_prescription: item.requires_prescription,
-      expiry_date: item.expiry_date,
-      last_ordered: item.last_ordered,
-      is_wholesale_product: item.is_wholesale_product,
-      is_retail_product: item.is_retail_product,
-      is_public_product: item.is_public_product,
-      wholesaler_id: item.wholesaler_id,
-      pharmacy_id: item.pharmacy_id,
-      user_id: item.user_id,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      branch_id: item.branch_id,
-      item_type_id: item.item_type_id,
-      sku: item.sku,
-      manufacturer: item.manufacturer,
-      dosage_form: item.dosage_form,
-      strength: item.strength,
-      pack_size: item.pack_size,
-      supplier: item.supplier,
-      batch_number: item.batch_number,
-      status: item.status as Product['status'],
-      image_url: item.image_url
-    }));
+    let query = supabase.from('products').select('*').lte('stock', 'min_stock_level').order('stock');
+    query = await getOrgProductQuery(query);
+    const { data, error } = await query;
+    if (error) { console.error('Error fetching low stock products:', error); throw error; }
+    return (data || []).map(mapProduct);
   }
 
+  /** Expiring products scoped to the current user's org */
   async getExpiringProducts(days: number = 30): Promise<Product[]> {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);
+    const today = new Date().toISOString().split('T')[0];
     
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
+    let query = supabase.from('products').select('*')
+      .gte('expiry_date', today)
       .lte('expiry_date', futureDate.toISOString().split('T')[0])
       .order('expiry_date');
-
-    if (error) {
-      console.error('Error fetching expiring products:', error);
-      throw error;
-    }
-
-    return (data || []).map(item => ({
-      id: item.id,
-      name: item.name,
-      description: item.description,
-      category: item.category,
-      price: item.sell_price || 0,
-      stock: item.stock,
-      min_stock: item.min_stock_level || 0,
-      max_stock: item.max_stock,
-      buy_price: item.buy_price || 0,
-      sell_price: item.sell_price || 0,
-      requires_prescription: item.requires_prescription,
-      expiry_date: item.expiry_date,
-      last_ordered: item.last_ordered,
-      is_wholesale_product: item.is_wholesale_product,
-      is_retail_product: item.is_retail_product,
-      is_public_product: item.is_public_product,
-      wholesaler_id: item.wholesaler_id,
-      pharmacy_id: item.pharmacy_id,
-      user_id: item.user_id,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      branch_id: item.branch_id,
-      item_type_id: item.item_type_id,
-      sku: item.sku,
-      manufacturer: item.manufacturer,
-      dosage_form: item.dosage_form,
-      strength: item.strength,
-      pack_size: item.pack_size,
-      supplier: item.supplier,
-      batch_number: item.batch_number,
-      status: item.status as Product['status'],
-      image_url: item.image_url
-    }));
+    query = await getOrgProductQuery(query);
+    const { data, error } = await query;
+    if (error) { console.error('Error fetching expiring products:', error); throw error; }
+    return (data || []).map(mapProduct);
   }
 
   async getSalesAnalytics(dateRange?: { from: Date; to: Date }): Promise<any[]> {
-    let query = supabase
-      .from('sales_analytics')
-      .select('*')
-      .order('date', { ascending: false });
-
+    let query = supabase.from('sales_analytics').select('*').order('date', { ascending: false });
     if (dateRange) {
-      query = query
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0]);
+      query = query.gte('date', dateRange.from.toISOString().split('T')[0]).lte('date', dateRange.to.toISOString().split('T')[0]);
     }
-
     const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching sales analytics:', error);
-      throw error;
-    }
-
+    if (error) { console.error('Error fetching sales analytics:', error); throw error; }
     return data || [];
   }
 
   async getProductAnalytics(productId?: string, dateRange?: { from: Date; to: Date }): Promise<any[]> {
-    let query = supabase
-      .from('product_analytics')
-      .select('*')
-      .order('date', { ascending: false });
-
-    if (productId) {
-      query = query.eq('product_id', productId);
-    }
-
+    let query = supabase.from('product_analytics').select('*').order('date', { ascending: false });
+    if (productId) query = query.eq('product_id', productId);
     if (dateRange) {
-      query = query
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0]);
+      query = query.gte('date', dateRange.from.toISOString().split('T')[0]).lte('date', dateRange.to.toISOString().split('T')[0]);
     }
-
     const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching product analytics:', error);
-      throw error;
-    }
-
+    if (error) { console.error('Error fetching product analytics:', error); throw error; }
     return data || [];
   }
 }
