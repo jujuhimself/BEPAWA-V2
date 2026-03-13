@@ -67,7 +67,16 @@ export const AnalyticsDashboard = () => {
           .in('status', ['completed', 'paid', 'delivered', 'delivered_and_paid']);
         const { data: prevOrders } = await prevQ;
 
-        const prevRev = (prevOrders || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        // Also get previous period POS
+        const { data: prevPosSales } = await supabase
+          .from('pos_sales')
+          .select('total_amount')
+          .eq('user_id', orgId)
+          .gte('sale_date', prevStartStr)
+          .lt('sale_date', start);
+        
+        const prevRev = (prevOrders || []).reduce((s, o) => s + Number(o.total_amount || 0), 0)
+          + (prevPosSales || []).reduce((s, p) => s + Number(p.total_amount || 0), 0);
         setPrevPeriodRevenue(prevRev);
         setPrevPeriodOrders((prevOrders || []).length);
 
