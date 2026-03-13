@@ -80,16 +80,25 @@ export const AnalyticsDashboard = () => {
         setPrevPeriodRevenue(prevRev);
         setPrevPeriodOrders((prevOrders || []).length);
 
-        // Build daily revenue & orders data
+        // Build daily revenue & orders data — include POS sales
         const allDays = eachDayOfInterval({ start: startDate, end: endDate });
         const dailyMap: Record<string, { revenue: number; orders: number }> = {};
         allDays.forEach(d => {
           dailyMap[format(d, 'yyyy-MM-dd')] = { revenue: 0, orders: 0 };
         });
-        (currentOrders || []).forEach((o: any) => {
+        // Count non-cart orders
+        (currentOrders || []).filter((o: any) => o.status !== 'cart').forEach((o: any) => {
           const day = format(new Date(o.created_at), 'yyyy-MM-dd');
           if (dailyMap[day]) {
             dailyMap[day].revenue += Number(o.total_amount || 0);
+            dailyMap[day].orders += 1;
+          }
+        });
+        // Add POS sales revenue
+        (posSalesData || []).forEach((s: any) => {
+          const day = format(new Date(s.sale_date || s.created_at), 'yyyy-MM-dd');
+          if (dailyMap[day]) {
+            dailyMap[day].revenue += Number(s.total_amount || 0);
             dailyMap[day].orders += 1;
           }
         });
