@@ -37,18 +37,28 @@ export const AnalyticsDashboard = () => {
         const end = format(endDate, 'yyyy-MM-dd');
         const prevStartStr = format(prevStart, 'yyyy-MM-dd');
 
-        // Build base query filters
+        // Build base query filters — use org columns for providers
+        const orgId = user.id; // for staff, AuthContext sets user.id to employer org id
         const roleFilter = (q: any) => {
-          if (user.role === 'retail') return q.eq('pharmacy_id', user.id);
-          if (user.role === 'wholesale') return q.eq('wholesaler_id', user.id);
-          return q.eq('user_id', user.id);
+          if (user.role === 'retail') return q.eq('pharmacy_id', orgId);
+          if (user.role === 'wholesale') return q.eq('wholesaler_id', orgId);
+          return q.eq('user_id', orgId);
         };
 
-        // Current period orders
+        // Current period orders (provider RLS policies now allow this)
         let currentQ = supabase.from('orders').select('id, total_amount, created_at, status');
         currentQ = roleFilter(currentQ);
-        currentQ = currentQ.gte('created_at', start).lte('created_at', end + 'T23:59:59');
+        currentQ = currentQ.gte('created_at', start).lte('created_at', end + 'T23:59:59')
+          .in('status', ['pending', 'completed', 'paid', 'delivered', 'delivered_and_paid', 'cart']);
         const { data: currentOrders } = await currentQ;
+
+        // Also fetch POS sales for the same period
+        const { data: posSalesData } = await supabase
+          .from('pos_sales')
+          .select('id, total_amount, sale_date, created_at')
+          .eq('user_id', orgId)
+          .gte('sale_date', start)
+          .lte('sale_date', end);
 
         // Previous period orders for comparison
         let prevQ = supabase.from('orders').select('id, total_amount');
