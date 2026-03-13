@@ -63,7 +63,8 @@ export const AnalyticsDashboard = () => {
         // Previous period orders for comparison
         let prevQ = supabase.from('orders').select('id, total_amount');
         prevQ = roleFilter(prevQ);
-        prevQ = prevQ.gte('created_at', prevStartStr).lt('created_at', start);
+        prevQ = prevQ.gte('created_at', prevStartStr).lt('created_at', start)
+          .in('status', ['completed', 'paid', 'delivered', 'delivered_and_paid']);
         const { data: prevOrders } = await prevQ;
 
         const prevRev = (prevOrders || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
