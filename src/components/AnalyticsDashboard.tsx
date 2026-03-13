@@ -37,39 +37,68 @@ export const AnalyticsDashboard = () => {
         const end = format(endDate, 'yyyy-MM-dd');
         const prevStartStr = format(prevStart, 'yyyy-MM-dd');
 
-        // Build base query filters
+        // Build base query filters — use org columns for providers
+        const orgId = user.id; // for staff, AuthContext sets user.id to employer org id
         const roleFilter = (q: any) => {
-          if (user.role === 'retail') return q.eq('pharmacy_id', user.id);
-          if (user.role === 'wholesale') return q.eq('wholesaler_id', user.id);
-          return q.eq('user_id', user.id);
+          if (user.role === 'retail') return q.eq('pharmacy_id', orgId);
+          if (user.role === 'wholesale') return q.eq('wholesaler_id', orgId);
+          return q.eq('user_id', orgId);
         };
 
-        // Current period orders
+        // Current period orders (provider RLS policies now allow this)
         let currentQ = supabase.from('orders').select('id, total_amount, created_at, status');
         currentQ = roleFilter(currentQ);
-        currentQ = currentQ.gte('created_at', start).lte('created_at', end + 'T23:59:59');
+        currentQ = currentQ.gte('created_at', start).lte('created_at', end + 'T23:59:59')
+          .in('status', ['pending', 'completed', 'paid', 'delivered', 'delivered_and_paid', 'cart']);
         const { data: currentOrders } = await currentQ;
+
+        // Also fetch POS sales for the same period
+        const { data: posSalesData } = await supabase
+          .from('pos_sales')
+          .select('id, total_amount, sale_date, created_at')
+          .eq('user_id', orgId)
+          .gte('sale_date', start)
+          .lte('sale_date', end);
 
         // Previous period orders for comparison
         let prevQ = supabase.from('orders').select('id, total_amount');
         prevQ = roleFilter(prevQ);
-        prevQ = prevQ.gte('created_at', prevStartStr).lt('created_at', start);
+        prevQ = prevQ.gte('created_at', prevStartStr).lt('created_at', start)
+          .in('status', ['completed', 'paid', 'delivered', 'delivered_and_paid']);
         const { data: prevOrders } = await prevQ;
 
-        const prevRev = (prevOrders || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+        // Also get previous period POS
+        const { data: prevPosSales } = await supabase
+          .from('pos_sales')
+          .select('total_amount')
+          .eq('user_id', orgId)
+          .gte('sale_date', prevStartStr)
+          .lt('sale_date', start);
+        
+        const prevRev = (prevOrders || []).reduce((s, o) => s + Number(o.total_amount || 0), 0)
+          + (prevPosSales || []).reduce((s, p) => s + Number(p.total_amount || 0), 0);
         setPrevPeriodRevenue(prevRev);
         setPrevPeriodOrders((prevOrders || []).length);
 
-        // Build daily revenue & orders data
+        // Build daily revenue & orders data — include POS sales
         const allDays = eachDayOfInterval({ start: startDate, end: endDate });
         const dailyMap: Record<string, { revenue: number; orders: number }> = {};
         allDays.forEach(d => {
           dailyMap[format(d, 'yyyy-MM-dd')] = { revenue: 0, orders: 0 };
         });
-        (currentOrders || []).forEach((o: any) => {
+        // Count non-cart orders
+        (currentOrders || []).filter((o: any) => o.status !== 'cart').forEach((o: any) => {
           const day = format(new Date(o.created_at), 'yyyy-MM-dd');
           if (dailyMap[day]) {
             dailyMap[day].revenue += Number(o.total_amount || 0);
+            dailyMap[day].orders += 1;
+          }
+        });
+        // Add POS sales revenue
+        (posSalesData || []).forEach((s: any) => {
+          const day = format(new Date(s.sale_date || s.created_at), 'yyyy-MM-dd');
+          if (dailyMap[day]) {
+            dailyMap[day].revenue += Number(s.total_amount || 0);
             dailyMap[day].orders += 1;
           }
         });
