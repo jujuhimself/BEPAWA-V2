@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Package, LogOut, User, Menu, Bell, X } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationCenter } from "./NotificationSystem";
 import { GlobalSearch } from "./GlobalSearch";
@@ -122,9 +123,15 @@ const ResponsiveNavigation = () => {
                     {getRoleDisplayName(user?.role)}
                   </p>
                 </div>
-                <Button variant="ghost" size="sm" className="p-2">
-                  <User className="h-4 w-4" />
-                </Button>
+                <Avatar className="h-8 w-8">
+                  {user?.profilePhotoUrl ? (
+                    <AvatarImage src={user.profilePhotoUrl} alt={user.name} className="object-cover" />
+                  ) : (
+                    <AvatarFallback className="bg-muted text-muted-foreground">
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  )}
+                </Avatar>
               </div>
             )}
 

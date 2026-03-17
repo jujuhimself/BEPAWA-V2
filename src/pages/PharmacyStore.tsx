@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, MapPin, Phone, ArrowLeft, Loader2, Search } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ShoppingCart, MapPin, Phone, ArrowLeft, Loader2, Search, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -207,18 +208,29 @@ const PharmacyStore = () => {
         {/* Pharmacy Info */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="text-2xl">{pharmacy.pharmacy_name || pharmacy.business_name || pharmacy.name}</CardTitle>
-            <div className="flex items-center gap-4 mt-2 flex-wrap">
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <MapPin className="h-4 w-4" />
-                <span>{pharmacy.address || `${pharmacy.city || ''}, ${pharmacy.region || 'Tanzania'}`}</span>
-              </div>
-              {pharmacy.phone && (
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <span>{pharmacy.phone}</span>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                {pharmacy.profile_photo_url ? (
+                  <AvatarImage src={pharmacy.profile_photo_url} alt={pharmacy.pharmacy_name || pharmacy.name} className="object-cover" />
+                ) : (
+                  <AvatarFallback className="bg-muted"><Store className="h-7 w-7" /></AvatarFallback>
+                )}
+              </Avatar>
+              <div>
+                <CardTitle className="text-2xl">{pharmacy.pharmacy_name || pharmacy.business_name || pharmacy.name}</CardTitle>
+                <div className="flex items-center gap-4 mt-2 flex-wrap">
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    <span>{pharmacy.address || `${pharmacy.city || ''}, ${pharmacy.region || 'Tanzania'}`}</span>
+                  </div>
+                  {pharmacy.phone && (
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                      <span>{pharmacy.phone}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </CardHeader>
         </Card>

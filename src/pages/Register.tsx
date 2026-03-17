@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { useAuth, User } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import RoleSelector from "@/components/RoleSelector";
 import LocationPicker, { LocationData } from "@/components/delivery/LocationPicker";
+import ProfilePhotoUpload from "@/components/ProfilePhotoUpload";
 
 interface FormData {
   // Common fields
@@ -78,6 +79,8 @@ const Register = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
@@ -446,6 +449,15 @@ const Register = () => {
                     onChange={(e) => handleInputChange('operatingHours', e.target.value)}
                   />
                 </div>
+                <ProfilePhotoUpload
+                  previewOnly
+                  currentPhotoUrl={profilePhotoPreview}
+                  onPhotoUploaded={(url) => setProfilePhotoPreview(url)}
+                  onFileSelected={(file) => setProfilePhotoFile(file)}
+                  label="Business Profile Photo"
+                  required
+                  size="lg"
+                />
               </div>
             )}
 
@@ -492,6 +504,15 @@ const Register = () => {
                     onChange={(e) => handleInputChange('operatingHours', e.target.value)}
                   />
                 </div>
+                <ProfilePhotoUpload
+                  previewOnly
+                  currentPhotoUrl={profilePhotoPreview}
+                  onPhotoUploaded={(url) => setProfilePhotoPreview(url)}
+                  onFileSelected={(file) => setProfilePhotoFile(file)}
+                  label="Business Profile Photo"
+                  required
+                  size="lg"
+                />
               </div>
             )}
 

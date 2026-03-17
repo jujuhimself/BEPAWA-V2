@@ -13,6 +13,7 @@ export interface PharmacyProfile {
   operatingHours: string;
   latitude?: number;
   longitude?: number;
+  profilePhotoUrl?: string;
 }
 
 /**
@@ -34,7 +35,7 @@ export async function fetchPharmacyProfiles(): Promise<PharmacyProfile[]> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, business_name, pharmacy_name, region, city, phone, address, is_approved, operating_hours, latitude, longitude')
+    .select('id, name, business_name, pharmacy_name, region, city, phone, address, is_approved, operating_hours, latitude, longitude, profile_photo_url')
     .eq('role', 'retail')
     .eq('is_approved', true)
     .not('pharmacy_name', 'is', null)
@@ -54,5 +55,6 @@ export async function fetchPharmacyProfiles(): Promise<PharmacyProfile[]> {
     operatingHours: p.operating_hours || '8:00 AM - 8:00 PM',
     latitude: p.latitude,
     longitude: p.longitude,
+    profilePhotoUrl: p.profile_photo_url || undefined,
   }));
 }

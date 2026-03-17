@@ -24,6 +24,7 @@ export interface User {
   phone?: string;
   address?: string;
   createdAt?: string;
+  profilePhotoUrl?: string;
   
   // Individual user fields
   dateOfBirth?: string;
@@ -105,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       phone: profile.phone,
       address: profile.address,
       createdAt: profile.created_at,
+      profilePhotoUrl: profile.profile_photo_url,
       dateOfBirth: profile.date_of_birth,
       emergencyContact: profile.emergency_contact,
       pharmacyName: profile.pharmacy_name,

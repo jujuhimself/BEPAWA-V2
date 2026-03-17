@@ -2609,6 +2609,7 @@ export type Database = {
           pharmacy_rating: number | null
           phone: string | null
           preferred_lang: string | null
+          profile_photo_url: string | null
           region: string | null
           role: Database["public"]["Enums"]["user_role"]
           self_test_available: boolean | null
@@ -2657,6 +2658,7 @@ export type Database = {
           pharmacy_rating?: number | null
           phone?: string | null
           preferred_lang?: string | null
+          profile_photo_url?: string | null
           region?: string | null
           role: Database["public"]["Enums"]["user_role"]
           self_test_available?: boolean | null
@@ -2705,6 +2707,7 @@ export type Database = {
           pharmacy_rating?: number | null
           phone?: string | null
           preferred_lang?: string | null
+          profile_photo_url?: string | null
           region?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           self_test_available?: boolean | null
