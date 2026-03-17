@@ -23,7 +23,7 @@ const BepawaCare = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-                <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">
+                <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">
                   Chat on WhatsApp
                 </a>
               </Button>
