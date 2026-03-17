@@ -44,7 +44,8 @@ const PharmacyFinder = () => {
           distance: `${(Math.random() * 5).toFixed(1)} km`,
           isOpen: true,
           operatingHours: profile.operatingHours,
-          services: ["Prescription", "OTC Medicines", "Delivery"]
+          services: ["Prescription", "OTC Medicines", "Delivery"],
+          profilePhotoUrl: profile.profilePhotoUrl,
         }));
         setPharmacies(mappedPharmacies);
       } catch (error) {
