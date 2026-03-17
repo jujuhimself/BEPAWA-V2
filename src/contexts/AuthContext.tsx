@@ -24,6 +24,7 @@ export interface User {
   phone?: string;
   address?: string;
   createdAt?: string;
+  profilePhotoUrl?: string;
   
   // Individual user fields
   dateOfBirth?: string;
