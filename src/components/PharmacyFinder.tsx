@@ -116,10 +116,19 @@ const PharmacyFinder = () => {
             <Card key={pharmacy.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{pharmacy.name}</h3>
-                    <p className="text-muted-foreground text-sm flex items-center gap-1"><MapPin className="h-3 w-3" />{pharmacy.address}</p>
-                    <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1"><Phone className="h-3 w-3" />{pharmacy.phone}</p>
+                  <div className="flex gap-3 flex-1">
+                    <Avatar className="h-12 w-12 shrink-0">
+                      {pharmacy.profilePhotoUrl ? (
+                        <AvatarImage src={pharmacy.profilePhotoUrl} alt={pharmacy.name} className="object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-muted"><Store className="h-5 w-5" /></AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <h3 className="font-semibold text-lg">{pharmacy.name}</h3>
+                      <p className="text-muted-foreground text-sm flex items-center gap-1"><MapPin className="h-3 w-3" />{pharmacy.address}</p>
+                      <p className="text-muted-foreground text-sm flex items-center gap-1 mt-1"><Phone className="h-3 w-3" />{pharmacy.phone}</p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1 mb-1"><Star className="h-4 w-4 fill-yellow-400 text-yellow-400" /><span className="font-medium">{pharmacy.rating.toFixed(1)}</span></div>
