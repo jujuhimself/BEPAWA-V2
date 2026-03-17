@@ -11,6 +11,7 @@ import { useAuth, User } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import RoleSelector from "@/components/RoleSelector";
 import LocationPicker, { LocationData } from "@/components/delivery/LocationPicker";
+import ProfilePhotoUpload from "@/components/ProfilePhotoUpload";
 
 interface FormData {
   // Common fields
