@@ -35,7 +35,7 @@ export async function fetchPharmacyProfiles(): Promise<PharmacyProfile[]> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, business_name, pharmacy_name, region, city, phone, address, is_approved, operating_hours, latitude, longitude')
+    .select('id, name, business_name, pharmacy_name, region, city, phone, address, is_approved, operating_hours, latitude, longitude, profile_photo_url')
     .eq('role', 'retail')
     .eq('is_approved', true)
     .not('pharmacy_name', 'is', null)
