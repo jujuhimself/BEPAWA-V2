@@ -10,6 +10,7 @@ interface ProfilePhotoUploadProps {
   currentPhotoUrl?: string | null;
   userId?: string;
   onPhotoUploaded: (url: string) => void;
+  onFileSelected?: (file: File) => void;
   /** If true, stores to a temp preview (for registration before user exists) */
   previewOnly?: boolean;
   label?: string;
