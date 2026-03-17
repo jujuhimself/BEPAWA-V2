@@ -167,25 +167,32 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
             {filteredPharmacies.map((pharmacy) => (
               <Card key={pharmacy.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{pharmacy.name}</CardTitle>
-                      <p className="text-muted-foreground flex items-center mt-1">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        {pharmacy.location}
+                  <div className="flex gap-3 items-start">
+                    <Avatar className="h-14 w-14 shrink-0">
+                      {pharmacy.profilePhotoUrl ? (
+                        <AvatarImage src={pharmacy.profilePhotoUrl} alt={pharmacy.name} className="object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-muted text-muted-foreground">
+                          <Store className="h-6 w-6" />
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate">{pharmacy.name}</CardTitle>
+                      <p className="text-muted-foreground flex items-center mt-1 text-sm">
+                        <MapPin className="h-4 w-4 mr-1 shrink-0" />
+                        <span className="truncate">{pharmacy.location}</span>
                       </p>
                       {pharmacy.phone && pharmacy.phone !== 'N/A' && (
-                        <p className="text-muted-foreground flex items-center mt-1">
-                          <Phone className="h-4 w-4 mr-1" />
+                        <p className="text-muted-foreground flex items-center mt-1 text-sm">
+                          <Phone className="h-4 w-4 mr-1 shrink-0" />
                           {pharmacy.phone}
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="flex items-center">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="ml-1 font-medium">{pharmacy.rating}</span>
-                      </div>
+                    <div className="flex items-center shrink-0">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="ml-1 font-medium text-sm">{pharmacy.rating}</span>
                     </div>
                   </div>
                 </CardHeader>
