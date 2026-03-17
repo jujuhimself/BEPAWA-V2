@@ -12,6 +12,7 @@ import { Settings, Shield, Bell, Download, FileText, User, MessageSquare, MapPin
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import LocationPicker, { LocationData } from "@/components/delivery/LocationPicker";
+import ProfilePhotoUpload from "@/components/ProfilePhotoUpload";
 
 const SystemSettings = () => {
   const { user } = useAuth();
