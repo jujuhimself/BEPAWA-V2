@@ -302,7 +302,7 @@ const BepawaCare = () => {
           <h4 className="text-2xl font-bold text-gray-900 mb-3">Start your journey today – your mental health is your right.</h4>
           <div className="flex flex-col sm:flex-row justify-center gap-3">
             <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-              <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
+              <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
               <Link to="/appointments">Book a Counselor</Link>
