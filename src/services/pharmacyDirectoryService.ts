@@ -13,6 +13,7 @@ export interface PharmacyProfile {
   operatingHours: string;
   latitude?: number;
   longitude?: number;
+  profilePhotoUrl?: string;
 }
 
 /**
