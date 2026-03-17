@@ -84,7 +84,8 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
         isOpen: true,
         hours: p.operatingHours,
         phone: p.phone,
-        stock: allStock[p.id] || []
+        stock: allStock[p.id] || [],
+        profilePhotoUrl: p.profilePhotoUrl,
       }));
 
       setPharmacies(pharmacyData);

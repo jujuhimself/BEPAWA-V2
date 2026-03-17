@@ -55,5 +55,6 @@ export async function fetchPharmacyProfiles(): Promise<PharmacyProfile[]> {
     operatingHours: p.operating_hours || '8:00 AM - 8:00 PM',
     latitude: p.latitude,
     longitude: p.longitude,
+    profilePhotoUrl: p.profile_photo_url || undefined,
   }));
 }
