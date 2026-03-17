@@ -24,6 +24,7 @@ interface Pharmacy {
   hours: string;
   phone: string;
   stock: any[];
+  profilePhotoUrl?: string;
 }
 
 interface PharmacyDirectoryProps {
