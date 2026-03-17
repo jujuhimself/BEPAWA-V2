@@ -137,7 +137,7 @@ const BepawaCare = () => {
               <div className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" /> Specialized therapy: trauma recovery, HIV stigma & disclosure, family/relationship, addiction</div>
               <div className="pt-2">
                 <Button variant="outline" asChild className="w-full">
-                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Talk to a counselor</a>
+                  <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">Talk to a counselor</a>
                 </Button>
               </div>
             </CardContent>
