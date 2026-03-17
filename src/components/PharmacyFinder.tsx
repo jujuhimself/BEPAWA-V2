@@ -19,6 +19,7 @@ interface Pharmacy {
   isOpen: boolean;
   operatingHours: string;
   services: string[];
+  profilePhotoUrl?: string;
 }
 
 const PharmacyFinder = () => {
