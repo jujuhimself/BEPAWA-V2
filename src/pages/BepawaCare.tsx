@@ -212,7 +212,7 @@ const BepawaCare = () => {
                   <Link to="/appointments">Book Session</Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">WhatsApp</a>
+                  <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">WhatsApp</a>
                 </Button>
               </div>
             </div>
