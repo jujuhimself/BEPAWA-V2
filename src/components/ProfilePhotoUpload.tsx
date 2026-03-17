@@ -28,6 +28,7 @@ export default function ProfilePhotoUpload({
   currentPhotoUrl,
   userId,
   onPhotoUploaded,
+  onFileSelected,
   previewOnly = false,
   label = "Profile Photo",
   required = false,
