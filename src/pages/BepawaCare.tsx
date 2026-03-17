@@ -352,7 +352,7 @@ const BepawaCare = () => {
             <div>
               <h4 className="font-semibold mb-4 text-lg">Support</h4>
               <ul className="space-y-3 text-gray-400">
-                <li><a href="https://wa.me/255744969325" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Healthcare Support (WhatsApp)</a></li>
+                <li><a href="https://wa.me/255797344625" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Healthcare Support (WhatsApp)</a></li>
                 <li><Link to="/settings" className="hover:text-white transition-colors">Technical Help</Link></li>
                 <li><a href="#" className="hover:text-white transition-colors">Training Resources</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>
