@@ -453,6 +453,7 @@ const Register = () => {
                   previewOnly
                   currentPhotoUrl={profilePhotoPreview}
                   onPhotoUploaded={(url) => setProfilePhotoPreview(url)}
+                  onFileSelected={(file) => setProfilePhotoFile(file)}
                   label="Business Profile Photo"
                   required
                   size="lg"
