@@ -61,7 +61,7 @@ export default function ProfilePhotoUpload({
 
     if (previewOnly) {
       setSelectedFile(file);
-      // For registration, we pass the data URL; actual upload happens after account creation
+      onFileSelected?.(file);
       onPhotoUploaded(URL.createObjectURL(file));
       return;
     }
