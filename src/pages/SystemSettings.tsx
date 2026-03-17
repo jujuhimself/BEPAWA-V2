@@ -196,6 +196,20 @@ const SystemSettings = () => {
                 <CardTitle>General Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Profile Photo - show for retail, wholesale, lab */}
+                {user && ['retail', 'wholesale', 'lab'].includes(user.role) && (
+                  <ProfilePhotoUpload
+                    currentPhotoUrl={user.profilePhotoUrl}
+                    userId={user.authUserId || user.id}
+                    onPhotoUploaded={(url) => {
+                      // Force page refresh to update user context
+                      toast({ title: "Photo updated", description: "Your profile photo has been saved." });
+                    }}
+                    label="Business Profile Photo"
+                    size="lg"
+                  />
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="language">Language</Label>
