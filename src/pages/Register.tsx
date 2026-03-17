@@ -503,6 +503,14 @@ const Register = () => {
                     onChange={(e) => handleInputChange('operatingHours', e.target.value)}
                   />
                 </div>
+                <ProfilePhotoUpload
+                  previewOnly
+                  currentPhotoUrl={profilePhotoPreview}
+                  onPhotoUploaded={(url) => setProfilePhotoPreview(url)}
+                  label="Business Profile Photo"
+                  required
+                  size="lg"
+                />
               </div>
             )}
 
