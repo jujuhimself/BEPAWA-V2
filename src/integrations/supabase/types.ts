@@ -1109,6 +1109,45 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_transactions: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          reference: string | null
+          transaction_date: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference?: string | null
+          transaction_date?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reference?: string | null
+          transaction_date?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generated_reports: {
         Row: {
           created_at: string
@@ -2570,6 +2609,7 @@ export type Database = {
           pharmacy_rating: number | null
           phone: string | null
           preferred_lang: string | null
+          profile_photo_url: string | null
           region: string | null
           role: Database["public"]["Enums"]["user_role"]
           self_test_available: boolean | null
@@ -2618,6 +2658,7 @@ export type Database = {
           pharmacy_rating?: number | null
           phone?: string | null
           preferred_lang?: string | null
+          profile_photo_url?: string | null
           region?: string | null
           role: Database["public"]["Enums"]["user_role"]
           self_test_available?: boolean | null
@@ -2666,6 +2707,7 @@ export type Database = {
           pharmacy_rating?: number | null
           phone?: string | null
           preferred_lang?: string | null
+          profile_photo_url?: string | null
           region?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           self_test_available?: boolean | null
@@ -3757,6 +3799,7 @@ export type Database = {
     }
     Functions: {
       fulfill_order_stock: { Args: { p_order_id: string }; Returns: undefined }
+      get_active_staff_user_ids: { Args: never; Returns: string[] }
       get_current_user_role: { Args: never; Returns: string }
       get_orders_by_retailer: {
         Args: { retailer_uuid: string }
