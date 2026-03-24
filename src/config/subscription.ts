@@ -2,7 +2,7 @@ import { SubscriptionFeatures } from '@/types/subscription';
 
 export const SUBSCRIPTION_CONFIG = {
   // Set this to true to enable test mode in development
-  isTestMode: process.env.NODE_ENV === 'development',
+  isTestMode: import.meta.env.DEV,
   
   // Number of days for the trial period
   trialPeriod: 30,
