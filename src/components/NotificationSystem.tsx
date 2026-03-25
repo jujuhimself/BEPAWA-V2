@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell, X, AlertTriangle, CheckCircle, Info, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useOptionalAuth } from '@/contexts/AuthContext';
 import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/services/notificationService';
 
@@ -11,16 +11,10 @@ export const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  
-  // Safely access auth context - may not be available during HMR or initial mount
-  let user = null;
-  try {
-    const auth = useAuth();
-    user = auth.user;
-  } catch {
-    // Auth context not yet available
-    return null;
-  }
+  const auth = useOptionalAuth();
+  const user = auth?.user ?? null;
+
+  if (!user) return null;
 
   useEffect(() => {
     if (!user?.id) return;
