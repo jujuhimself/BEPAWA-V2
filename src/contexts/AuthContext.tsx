@@ -71,6 +71,10 @@ export const useAuth = () => {
   return context;
 };
 
+export const useOptionalAuth = () => {
+  return useContext(AuthContext);
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
