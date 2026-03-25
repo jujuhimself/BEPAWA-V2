@@ -144,6 +144,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check and link staff invitation on registration/login, returns StaffInfo
   const checkAndLinkStaffInvitation = async (userId: string, email: string): Promise<StaffInfo | null> => {
     try {
+      // Never link admin accounts to staff — admin role takes priority
+      const { data: profileCheck } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (profileCheck?.role === 'admin') {
+        console.log('Admin account detected, skipping staff linking for:', userId);
+        return null;
+      }
+
       // First check if already linked
       const { data: linkedStaff, error: linkedError } = await supabase
         .from('staff_members')
@@ -219,6 +231,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Ensure staff user's profile role matches their employer's role
   const ensureStaffProfileRole = async (userId: string, employerId: string) => {
     try {
+      // Guard: never overwrite admin profiles
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (currentProfile?.role === 'admin') {
+        console.log('Skipping role override for admin user:', userId);
+        return;
+      }
+
       const { data: employerProfile } = await supabase
         .from('profiles')
         .select('role')
