@@ -77,11 +77,10 @@ class PrepPepServiceAPI {
 
   // ===== BROWSING (INDIVIDUAL) =====
   async getAvailableServices(): Promise<(PrepPepService & { lab: any })[]> {
-    // Only return services from the dedicated prep_pep_services table
-    // PrEP/PEP services are distinct from HIV self-test kits (which are in PersonalHealth)
+    // Return services from both labs and pharmacies via the prep_pep_services table
     const { data, error } = await supabase
       .from('prep_pep_services')
-      .select('*, lab:profiles!prep_pep_services_lab_id_fkey(id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude)')
+      .select('*, lab:profiles!prep_pep_services_lab_id_fkey(id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude, role)')
       .eq('is_available', true)
       .eq('stock_status', 'available');
 
