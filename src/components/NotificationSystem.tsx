@@ -14,8 +14,6 @@ export const NotificationCenter = () => {
   const auth = useOptionalAuth();
   const user = auth?.user ?? null;
 
-  if (!user) return null;
-
   useEffect(() => {
     if (!user?.id) return;
 
@@ -25,19 +23,15 @@ export const NotificationCenter = () => {
     const channel = notificationService.subscribeToNotifications(
       user.id,
       (notification) => {
-        // Show toast for new notifications
         toast({
           title: notification.title,
           description: notification.message,
           variant: notification.type === 'error' ? 'destructive' : 'default',
         });
-        
-        // Reload notifications list
         loadNotifications();
       }
     );
 
-    // Poll for notifications every 30 seconds as backup
     const interval = setInterval(loadNotifications, 30000);
 
     return () => {
@@ -45,6 +39,8 @@ export const NotificationCenter = () => {
       clearInterval(interval);
     };
   }, [user?.id, toast]);
+
+  if (!user) return null;
 
   const loadNotifications = async () => {
     if (!user?.id) return;
