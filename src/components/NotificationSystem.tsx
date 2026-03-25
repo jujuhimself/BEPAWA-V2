@@ -11,7 +11,16 @@ export const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  
+  // Safely access auth context - may not be available during HMR or initial mount
+  let user = null;
+  try {
+    const auth = useAuth();
+    user = auth.user;
+  } catch {
+    // Auth context not yet available
+    return null;
+  }
 
   useEffect(() => {
     if (!user?.id) return;
