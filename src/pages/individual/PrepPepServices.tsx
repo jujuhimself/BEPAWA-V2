@@ -77,7 +77,7 @@ const PrepPepServices = () => {
     });
   };
 
-  // Group services by provider (lab or pharmacy)
+  // Group services by lab
   const labMap = new Map<string, { lab: any; services: any[] }>();
   services.forEach((s: any) => {
     const key = s.lab_id;
@@ -161,7 +161,7 @@ const PrepPepServices = () => {
 
         {/* Available Services */}
         <div>
-          <h2 className="text-xl font-bold mb-4">Available Facilities & Pharmacies</h2>
+          <h2 className="text-xl font-bold mb-4">Available Facilities</h2>
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading services...</div>
           ) : labMap.size === 0 ? (
@@ -171,12 +171,7 @@ const PrepPepServices = () => {
               {Array.from(labMap.entries()).map(([labId, { lab, services: labServices }]) => (
                 <Card key={labId} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      {lab?.business_name || lab?.pharmacy_name || lab?.name || 'Health Facility'}
-                      <Badge variant="outline" className="text-xs">
-                        {lab?.role === 'retail' ? 'Pharmacy' : 'Lab'}
-                      </Badge>
-                    </CardTitle>
+                    <CardTitle className="text-lg">{lab?.business_name || lab?.name || 'Health Facility'}</CardTitle>
                     <CardDescription className="flex items-center gap-1">
                       <MapPin className="h-3.5 w-3.5" />
                       {lab?.address || `${lab?.city || ''}, ${lab?.region || ''}`.trim() || 'Location not set'}

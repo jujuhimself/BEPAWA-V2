@@ -14,8 +14,7 @@ import {
   FileText,
   CreditCard,
   Truck,
-  Plus,
-  Shield
+  Plus
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +29,6 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import BusinessTools from '@/components/BusinessTools';
 import { InvoiceGenerator } from "@/components/invoice/InvoiceGenerator";
 import PharmacyCODOrders from "@/components/pharmacy/PharmacyCODOrders";
-import PrepPepManagement from "@/components/lab/PrepPepManagement";
 
 import {
   DashboardLayout,
@@ -290,19 +288,6 @@ export default function PharmacyDashboard() {
           <Card className="border-border bg-card">
             <CardContent className="pt-6">
               <AnalyticsDashboard />
-            </CardContent>
-          </Card>
-        </DashboardSection>
-
-        {/* PrEP & PEP Services */}
-        <DashboardSection
-          title="PrEP & PEP Services"
-          description="Manage HIV prevention services — set availability, pricing, and handle bookings"
-          icon={<Shield className="h-4 w-4" />}
-        >
-          <Card className="border-border bg-card">
-            <CardContent className="pt-6">
-              <PrepPepManagement />
             </CardContent>
           </Card>
         </DashboardSection>

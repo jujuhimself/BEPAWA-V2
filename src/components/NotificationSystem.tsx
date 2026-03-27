@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell, X, AlertTriangle, CheckCircle, Info, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useOptionalAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { notificationService } from '@/services/notificationService';
 import type { Notification } from '@/services/notificationService';
 
@@ -11,8 +11,7 @@ export const NotificationCenter = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
-  const auth = useOptionalAuth();
-  const user = auth?.user ?? null;
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!user?.id) return;
@@ -23,15 +22,19 @@ export const NotificationCenter = () => {
     const channel = notificationService.subscribeToNotifications(
       user.id,
       (notification) => {
+        // Show toast for new notifications
         toast({
           title: notification.title,
           description: notification.message,
           variant: notification.type === 'error' ? 'destructive' : 'default',
         });
+        
+        // Reload notifications list
         loadNotifications();
       }
     );
 
+    // Poll for notifications every 30 seconds as backup
     const interval = setInterval(loadNotifications, 30000);
 
     return () => {
@@ -39,8 +42,6 @@ export const NotificationCenter = () => {
       clearInterval(interval);
     };
   }, [user?.id, toast]);
-
-  if (!user) return null;
 
   const loadNotifications = async () => {
     if (!user?.id) return;

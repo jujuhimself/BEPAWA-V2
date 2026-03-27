@@ -3798,7 +3798,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       fulfill_order_stock: { Args: { p_order_id: string }; Returns: undefined }
       get_active_staff_user_ids: { Args: never; Returns: string[] }
       get_current_user_role: { Args: never; Returns: string }

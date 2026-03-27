@@ -125,7 +125,7 @@ const IndividualDashboard = () => {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="gap-2">
-                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">
+                  <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">
                     <MessageCircle className="h-4 w-4" />
                     WhatsApp
                   </a>
@@ -144,101 +144,6 @@ const IndividualDashboard = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Breaking the Stigma Section */}
-      <div className="rounded-2xl bg-gradient-to-b from-rose-50/60 via-background to-background py-10 px-2 md:px-6">
-        <div className="text-center max-w-3xl mx-auto mb-8">
-          <Badge className="mb-4 bg-rose-100 text-rose-600 border-rose-200 text-sm px-4 py-1">
-            Breaking the Stigma
-          </Badge>
-          <h3 className="text-2xl md:text-3xl font-extrabold text-foreground mb-3">
-            Your Health, Your Privacy — Without Stigma
-          </h3>
-          <p className="text-muted-foreground text-sm md:text-base leading-relaxed">
-            Safe, private access to HIV prevention, testing, and support — right from your phone.
-          </p>
-        </div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
-          <Card className="border border-border/60 shadow-md hover:shadow-lg transition-shadow bg-card">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">🧪</span>
-                <h4 className="font-bold text-foreground">Order HIV Test Kits Privately</h4>
-              </div>
-              <p className="text-muted-foreground text-sm flex-1">Delivered discreetly to your door. No one needs to know but you.</p>
-              <Button asChild className="mt-4 w-full bg-rose-500 hover:bg-rose-600 text-white">
-                <Link to="/dashboard/personal-health#hiv">Order Now</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border/60 shadow-md hover:shadow-lg transition-shadow bg-card">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">💊</span>
-                <h4 className="font-bold text-foreground">PrEP — Daily Prevention</h4>
-              </div>
-              <p className="text-muted-foreground text-sm flex-1">Pre-Exposure Prophylaxis prevents HIV. Book a consultation at a certified facility.</p>
-              <Button asChild className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white">
-                <Link to="/prep-pep">Access PrEP</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border/60 shadow-md hover:shadow-lg transition-shadow bg-card">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">🚨</span>
-                <h4 className="font-bold text-foreground">PEP — Emergency Protection</h4>
-              </div>
-              <p className="text-muted-foreground text-sm flex-1">Must start within <strong>72 hours</strong> of exposure. Time-sensitive — act now.</p>
-              <Button asChild className="mt-4 w-full bg-amber-600 hover:bg-amber-700 text-white">
-                <Link to="/prep-pep">Get PEP Now</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border/60 shadow-md hover:shadow-lg transition-shadow bg-card">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">✂️</span>
-                <h4 className="font-bold text-foreground">Book Circumcision</h4>
-              </div>
-              <p className="text-muted-foreground text-sm flex-1">Free and confidential for individuals aged 15+. Choose a trusted clinic near you.</p>
-              <Button asChild className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white">
-                <Link to="/dashboard/personal-health#circumcision">Book Now</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border/60 shadow-md hover:shadow-lg transition-shadow bg-card">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">🤖</span>
-                <h4 className="font-bold text-foreground">Chat with Health Assistant</h4>
-              </div>
-              <p className="text-muted-foreground text-sm flex-1">Ask questions, get guidance, and talk things through — at your own pace.</p>
-              <Button asChild variant="outline" className="mt-4 w-full border-foreground/20 bg-foreground text-background hover:bg-foreground/90">
-                <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Start Chat</a>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-border/60 shadow-md hover:shadow-lg transition-shadow bg-card">
-            <CardContent className="p-5 flex flex-col h-full">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">💚</span>
-                <h4 className="font-bold text-foreground">Stigma & Emotional Support</h4>
-              </div>
-              <p className="text-muted-foreground text-sm flex-1">Living with HIV? Get confidential counseling and community support.</p>
-              <Button asChild className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                <Link to="/appointments">Talk to a Counselor</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

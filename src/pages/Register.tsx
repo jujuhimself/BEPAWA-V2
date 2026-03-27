@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Package, ArrowLeft, ArrowRight } from "lucide-react";
 import { useAuth, User } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import RoleSelector from "@/components/RoleSelector";
+import LocationPicker, { LocationData } from "@/components/delivery/LocationPicker";
+import ProfilePhotoUpload from "@/components/ProfilePhotoUpload";
 
 interface FormData {
   // Common fields
@@ -75,7 +77,10 @@ const Register = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { register } = useAuth();
@@ -154,7 +159,7 @@ const Register = () => {
     setIsLoading(true);
 
     // Prepare user data based on role
-    const userData: Partial<User> & { password: string } = {
+    const userData: Partial<User> & { password: string; latitude?: number; longitude?: number } = {
       name: formData.name,
       email: formData.email,
       password: formData.password,
@@ -162,6 +167,12 @@ const Register = () => {
       address: formData.address,
       role: formData.role as any,
     };
+
+    // Add coordinates if location was selected via map
+    if (selectedLocation) {
+      userData.latitude = selectedLocation.latitude;
+      userData.longitude = selectedLocation.longitude;
+    }
 
     // Add role-specific fields
     if (formData.role === 'individual') {
@@ -319,16 +330,39 @@ const Register = () => {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="address">Address *</Label>
-              <Textarea
-                id="address"
-                placeholder="Enter your complete address"
-                value={formData.address}
-                onChange={(e) => handleInputChange('address', e.target.value)}
-                required
-              />
-            </div>
+            {/* Show LocationPicker for business roles, plain textarea for others */}
+            {(formData.role === 'retail' || formData.role === 'wholesale' || formData.role === 'lab') ? (
+              <div className="space-y-2">
+                <Label>Business Location *</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Search or pin your exact location on the map for accurate delivery and directory listings
+                </p>
+                <LocationPicker
+                  onLocationSelect={(location) => {
+                    setSelectedLocation(location);
+                    handleInputChange('address', location.address);
+                  }}
+                  initialLocation={selectedLocation || undefined}
+                  placeholder="Search for your business location..."
+                />
+                {selectedLocation && (
+                  <p className="text-xs text-green-600 mt-1">
+                    📍 Location set: {selectedLocation.address}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="address">Address *</Label>
+                <Textarea
+                  id="address"
+                  placeholder="Enter your complete address"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  required
+                />
+              </div>
+            )}
           </div>
         );
 
@@ -415,6 +449,15 @@ const Register = () => {
                     onChange={(e) => handleInputChange('operatingHours', e.target.value)}
                   />
                 </div>
+                <ProfilePhotoUpload
+                  previewOnly
+                  currentPhotoUrl={profilePhotoPreview}
+                  onPhotoUploaded={(url) => setProfilePhotoPreview(url)}
+                  onFileSelected={(file) => setProfilePhotoFile(file)}
+                  label="Business Profile Photo"
+                  required
+                  size="lg"
+                />
               </div>
             )}
 
@@ -461,6 +504,15 @@ const Register = () => {
                     onChange={(e) => handleInputChange('operatingHours', e.target.value)}
                   />
                 </div>
+                <ProfilePhotoUpload
+                  previewOnly
+                  currentPhotoUrl={profilePhotoPreview}
+                  onPhotoUploaded={(url) => setProfilePhotoPreview(url)}
+                  onFileSelected={(file) => setProfilePhotoFile(file)}
+                  label="Business Profile Photo"
+                  required
+                  size="lg"
+                />
               </div>
             )}
 

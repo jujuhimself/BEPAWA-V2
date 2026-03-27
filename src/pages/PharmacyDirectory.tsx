@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Search, Star, Clock, Phone, ShoppingCart } from "lucide-react";
-import PharmacyCard from "@/components/PharmacyCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { MapPin, Search, Star, Clock, Phone, Store } from "lucide-react";
 import PharmacyStockDialog from "@/components/PharmacyStockDialog";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
@@ -14,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import PharmacyAppointmentScheduler from "@/components/pharmacy/PharmacyAppointmentScheduler";
 import { useNavigate } from "react-router-dom";
+import { fetchPharmacyProfiles, PharmacyProfile } from "@/services/pharmacyDirectoryService";
 
 interface Pharmacy {
   id: string;
@@ -25,6 +25,7 @@ interface Pharmacy {
   hours: string;
   phone: string;
   stock: any[];
+  profilePhotoUrl?: string;
 }
 
 interface PharmacyDirectoryProps {
@@ -46,31 +47,24 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchPharmacies();
+    loadPharmacies();
   }, []);
 
-  const fetchPharmacies = async () => {
+  const loadPharmacies = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, business_name, pharmacy_name, region, city, phone, address, is_approved, operating_hours')
-        .eq('role', 'retail')
-        .eq('is_approved', true)
-        .order('business_name');
+      // Use shared service that excludes staff
+      const profiles = await fetchPharmacyProfiles();
+      const pharmacyIds = profiles.map(p => p.id);
 
-      if (error) throw error;
-
-      // Fetch products for all pharmacies
-      const pharmacyIds = (data || []).map((pharmacy: any) => pharmacy.id);
+      // Fetch products only for these pharmacies
       let allStock: Record<string, any[]> = {};
       if (pharmacyIds.length > 0) {
-        const { data: productsData, error: productsError } = await supabase
+        const { data: productsData } = await supabase
           .from('products')
           .select('id, name, sell_price, stock, pharmacy_id')
           .in('pharmacy_id', pharmacyIds);
-        if (productsError) throw productsError;
-        // Group products by pharmacy_id
+
         allStock = (productsData || []).reduce((acc: Record<string, any[]>, product: any) => {
           if (!acc[product.pharmacy_id]) acc[product.pharmacy_id] = [];
           acc[product.pharmacy_id].push({
@@ -82,16 +76,17 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
         }, {});
       }
 
-      const pharmacyData: Pharmacy[] = (data || []).map((pharmacy: any) => ({
-        id: pharmacy.id,
-        name: pharmacy.pharmacy_name || pharmacy.business_name || pharmacy.name || 'Pharmacy',
-        location: pharmacy.address || ((pharmacy.city && pharmacy.region) ? `${pharmacy.city}, ${pharmacy.region}` : 'Location not set'),
-        rating: 4.5, // Default rating
-        distance: 'N/A', // Would need location services for real distance
-        isOpen: true, // Default to open
-        hours: pharmacy.operating_hours || '8:00 AM - 8:00 PM',
-        phone: pharmacy.phone || 'N/A',
-        stock: allStock[pharmacy.id] || []
+      const pharmacyData: Pharmacy[] = profiles.map((p) => ({
+        id: p.id,
+        name: p.name,
+        location: p.address,
+        rating: 4.5,
+        distance: 'N/A',
+        isOpen: true,
+        hours: p.operatingHours,
+        phone: p.phone,
+        stock: allStock[p.id] || [],
+        profilePhotoUrl: p.profilePhotoUrl,
       }));
 
       setPharmacies(pharmacyData);
@@ -114,7 +109,6 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
 
   const handleOrder = () => {
     if (selectedMedicine && quantity > 0) {
-      // Place order logic stub
       setOrderModal(false);
       setSelectedMedicine("");
       setQuantity(1);
@@ -131,7 +125,7 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
         <div className="container mx-auto px-4 py-8">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading pharmacies...</p>
+            <p className="text-muted-foreground">Loading pharmacies...</p>
           </div>
         </div>
       </div>
@@ -147,10 +141,9 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
           badge={{ text: "Healthcare", variant: "outline" }}
         />
         
-        {/* Search Bar */}
         <div className="mb-8">
           <div className="relative max-w-2xl mx-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
               placeholder="Search by pharmacy name or location..."
               value={searchTerm}
@@ -160,13 +153,12 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
           </div>
         </div>
         
-        {/* Pharmacy Grid */}
         {filteredPharmacies.length === 0 ? (
           <EmptyState
             title="No pharmacies found"
             description={searchTerm 
               ? "No pharmacies match your search criteria." 
-              : "Pharmacy directory will be populated as pharmacies join the platform. Check back soon for available pharmacies in your area."}
+              : "Pharmacy directory will be populated as pharmacies join the platform."}
             icon={<MapPin className="h-16 w-16" />}
             variant="card"
           />
@@ -175,26 +167,32 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
             {filteredPharmacies.map((pharmacy) => (
               <Card key={pharmacy.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{pharmacy.name}</CardTitle>
-                      <p className="text-gray-600 flex items-center mt-1">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        {pharmacy.location}
+                  <div className="flex gap-3 items-start">
+                    <Avatar className="h-14 w-14 shrink-0">
+                      {pharmacy.profilePhotoUrl ? (
+                        <AvatarImage src={pharmacy.profilePhotoUrl} alt={pharmacy.name} className="object-cover" />
+                      ) : (
+                        <AvatarFallback className="bg-muted text-muted-foreground">
+                          <Store className="h-6 w-6" />
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate">{pharmacy.name}</CardTitle>
+                      <p className="text-muted-foreground flex items-center mt-1 text-sm">
+                        <MapPin className="h-4 w-4 mr-1 shrink-0" />
+                        <span className="truncate">{pharmacy.location}</span>
                       </p>
                       {pharmacy.phone && pharmacy.phone !== 'N/A' && (
-                        <p className="text-gray-600 flex items-center mt-1">
-                          <Phone className="h-4 w-4 mr-1" />
+                        <p className="text-muted-foreground flex items-center mt-1 text-sm">
+                          <Phone className="h-4 w-4 mr-1 shrink-0" />
                           {pharmacy.phone}
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="flex items-center">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                        <span className="ml-1 font-medium">{pharmacy.rating}</span>
-                      </div>
-                      <p className="text-sm text-gray-500">{pharmacy.distance}</p>
+                    <div className="flex items-center shrink-0">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="ml-1 font-medium text-sm">{pharmacy.rating}</span>
                     </div>
                   </div>
                 </CardHeader>
@@ -205,7 +203,7 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
                         <Clock className="h-3 w-3 mr-1" />
                         {pharmacy.isOpen ? "Open" : "Closed"}
                       </Badge>
-                      <span className="text-sm text-gray-600">{pharmacy.hours}</span>
+                      <span className="text-sm text-muted-foreground">{pharmacy.hours}</span>
                     </div>
                     <div className="flex flex-col gap-2 pt-2 w-full">
                       <Button size="sm" className="w-full" onClick={() => navigate(`/pharmacy/${pharmacy.id}`)}>
@@ -222,7 +220,6 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
           </div>
         )}
         
-        {/* Pharmacy Details Modal */}
         {selectedPharmacy && (
           <PharmacyStockDialog
             open={!!selectedPharmacy}
@@ -236,7 +233,6 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
           />
         )}
         
-        {/* Order Modal */}
         <Dialog open={orderModal} onOpenChange={setOrderModal}>
           <DialogContent>
             <DialogHeader>
@@ -264,7 +260,6 @@ const PharmacyDirectory = ({ onSelectPharmacy, hideHeader }: PharmacyDirectoryPr
           </DialogContent>
         </Dialog>
 
-        {/* Appointment Scheduler Dialog */}
         <PharmacyAppointmentScheduler
           isOpen={showAppointmentDialog}
           onClose={() => setShowAppointmentDialog(false)}

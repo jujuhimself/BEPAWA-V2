@@ -33,6 +33,7 @@ const PublicCatalog = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const actorUserId = user?.authUserId || user?.id || '';
 
   const fetchProducts = async () => {
     try {
@@ -124,13 +125,13 @@ const PublicCatalog = () => {
 
   useEffect(() => {
     const fetchCartItems = async () => {
-      if (!user) return;
+      if (!user || !actorUserId) return;
 
       try {
         const { data, error } = await supabase
           .from('orders')
           .select('items')
-          .eq('user_id', user.id)
+          .eq('user_id', actorUserId)
           .eq('status', 'cart')
           .eq('role', user.role)
           .maybeSingle();
@@ -152,13 +153,13 @@ const PublicCatalog = () => {
       }
     };
 
-    if (user) {
+    if (user && actorUserId) {
       fetchCartItems();
     }
-  }, [user]);
+  }, [user, actorUserId]);
 
   const addToCart = async (product: Product) => {
-    if (!user) {
+    if (!user || !actorUserId) {
       toast({
         title: "Not authenticated",
         description: "Please log in to add items to your cart",
@@ -182,7 +183,7 @@ const PublicCatalog = () => {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart')
         .maybeSingle();
@@ -199,7 +200,7 @@ const PublicCatalog = () => {
             total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             updated_at: new Date().toISOString()
           })
-          .eq('user_id', user.id)
+          .eq('user_id', actorUserId)
           .eq('role', user.role)
           .eq('status', 'cart')
           .select()
@@ -218,13 +219,13 @@ const PublicCatalog = () => {
         const { data: newData, error: insertError } = await supabase
           .from('orders')
           .insert({
-            user_id: user.id,
+            user_id: actorUserId,
             status: 'cart',
             role: user.role,
             items: newCartItems,
             total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             updated_at: new Date().toISOString(),
-            order_number: `CART-${user.id}`,
+            order_number: `CART-${actorUserId}`,
           })
           .select()
           .maybeSingle();
@@ -271,7 +272,7 @@ const PublicCatalog = () => {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart')
         .maybeSingle();
@@ -288,7 +289,7 @@ const PublicCatalog = () => {
             total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             updated_at: new Date().toISOString()
           })
-          .eq('user_id', user.id)
+          .eq('user_id', actorUserId)
           .eq('role', user.role)
           .eq('status', 'cart')
           .select()
@@ -307,13 +308,13 @@ const PublicCatalog = () => {
         const { data: newData, error: insertError } = await supabase
           .from('orders')
           .insert({
-            user_id: user.id,
+            user_id: actorUserId,
             status: 'cart',
             role: user.role,
             items: newCartItems,
             total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
             updated_at: new Date().toISOString(),
-            order_number: `CART-${user.id}`,
+            order_number: `CART-${actorUserId}`,
           })
           .select()
           .maybeSingle();
@@ -358,13 +359,13 @@ const PublicCatalog = () => {
     }
 
     try {
-      console.log('Starting checkout for user:', user.id);
+      console.log('Starting checkout for user:', actorUserId);
       console.log('Cart items:', cartItems);
       // Check if cart order exists
       const { data: existingCart, error: cartError } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .maybeSingle();
@@ -390,10 +391,10 @@ const PublicCatalog = () => {
           status: 'pending',
           items: cartItems,
           total_amount: cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
-          order_number: `ORDER-${user.id}-${Date.now()}`,
+          order_number: `ORDER-${actorUserId}-${Date.now()}`,
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .select()

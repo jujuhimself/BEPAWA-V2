@@ -67,6 +67,7 @@ const Cart = () => {
   const [deliveryDistance, setDeliveryDistance] = useState<number>(0);
   
   const createCODOrder = useCreateCODOrder();
+  const actorUserId = user?.authUserId || user?.id || '';
 
   useEffect(() => {
     fetchCart();
@@ -80,7 +81,7 @@ const Cart = () => {
       const { data, error } = await supabase
         .from('orders')
         .select('items')
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('status', 'cart')
         .eq('role', user.role)
         .maybeSingle();
@@ -111,7 +112,7 @@ const Cart = () => {
           total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart');
       if (error) throw error;
@@ -132,7 +133,7 @@ const Cart = () => {
           total_amount: newCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart');
       if (error) throw error;
@@ -153,7 +154,7 @@ const Cart = () => {
           total_amount: 0,
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', user.id)
+        .eq('user_id', actorUserId)
         .eq('role', user.role)
         .eq('status', 'cart');
       if (error) throw error;
@@ -214,7 +215,7 @@ const Cart = () => {
     }
 
     createCODOrder.mutate({
-      user_id: user.id,
+      user_id: actorUserId,
       items: cartItems,
       total_amount: getTotalPrice() + getDeliveryFee(),
       delivery_address: deliveryLocation.address,
@@ -414,7 +415,7 @@ const Cart = () => {
                                 try {
                                   await new Promise((res) => setTimeout(res, 1200));
                                   const order = await orderService.createPlatformOrder({
-                                    user_id: user.id,
+                                    user_id: actorUserId,
                                     order_type: 'retail',
                                     order_number: undefined,
                                     total_amount: getTotalPrice(),
@@ -629,7 +630,7 @@ const Cart = () => {
                               try {
                                 await new Promise((res) => setTimeout(res, 1200));
                                 const order = await orderService.createPlatformOrder({
-                                  user_id: user.id,
+                                  user_id: actorUserId,
                                   order_type: user.role === 'wholesale' ? 'wholesale' : 'retail',
                                   order_number: undefined,
                                   total_amount: getTotalPrice(),

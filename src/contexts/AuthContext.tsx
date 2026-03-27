@@ -16,6 +16,7 @@ export interface StaffInfo {
 
 export interface User {
   id: string;
+  authUserId: string;
   email: string;
   name: string;
   role: 'admin' | 'individual' | 'retail' | 'wholesale' | 'lab' | 'delivery';
@@ -23,6 +24,7 @@ export interface User {
   phone?: string;
   address?: string;
   createdAt?: string;
+  profilePhotoUrl?: string;
   
   // Individual user fields
   dateOfBirth?: string;
@@ -71,10 +73,6 @@ export const useAuth = () => {
   return context;
 };
 
-export const useOptionalAuth = () => {
-  return useContext(AuthContext);
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -101,12 +99,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const convertProfileToUser = (profile: any, supabaseUser: SupabaseUser, staffInfo?: StaffInfo | null): User => {
     return {
       id: staffInfo ? staffInfo.employerId : profile.id, // Staff users operate as their employer
+      authUserId: supabaseUser.id,
       email: profile.email,
       name: profile.name,
       role: profile.role,
       phone: profile.phone,
       address: profile.address,
       createdAt: profile.created_at,
+      profilePhotoUrl: profile.profile_photo_url,
       dateOfBirth: profile.date_of_birth,
       emergencyContact: profile.emergency_contact,
       pharmacyName: profile.pharmacy_name,
@@ -148,25 +148,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check and link staff invitation on registration/login, returns StaffInfo
   const checkAndLinkStaffInvitation = async (userId: string, email: string): Promise<StaffInfo | null> => {
     try {
-      // Never link admin accounts to staff — admin role takes priority
-      const { data: profileCheck } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (profileCheck?.role === 'admin') {
-        console.log('Admin account detected, skipping staff linking for:', userId);
-        return null;
-      }
-
-      // First check if already linked
-      const { data: linkedStaff, error: linkedError } = await supabase
+      // Get active staff links for this auth user (handle duplicates safely)
+      const { data: linkedStaffRows, error: linkedError } = await supabase
         .from('staff_members')
         .select('*')
         .eq('user_id', userId)
         .eq('is_active', true)
-        .maybeSingle();
+        .order('updated_at', { ascending: false })
+        .limit(10);
+
+      if (linkedError) {
+        console.error('Error checking linked staff records:', linkedError);
+      }
+
+      const linkedStaff = (linkedStaffRows || [])[0];
 
       if (linkedStaff) {
         // Ensure profile role matches employer's role (fix mismatches)
@@ -181,18 +176,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      // Find any pending staff invitation for this email
-      const { data: staffInvitation, error } = await supabase
+      // Find pending staff invitations for this email and pick the latest
+
+      const { data: invitations, error } = await supabase
         .from('staff_members')
         .select('*')
         .eq('email', email.toLowerCase())
         .is('user_id', null)
-        .maybeSingle();
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(10);
 
       if (error) {
         console.error('Error checking staff invitation:', error);
         return null;
       }
+
+      const staffInvitation = (invitations || [])[0];
 
       if (staffInvitation) {
         // Link the user to the staff member record
@@ -211,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         console.log('Staff invitation linked successfully:', staffInvitation);
+
 
         // Update profile role to match employer's role so dashboard routing works
         await ensureStaffProfileRole(userId, staffInvitation.pharmacy_id);
@@ -235,18 +236,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Ensure staff user's profile role matches their employer's role
   const ensureStaffProfileRole = async (userId: string, employerId: string) => {
     try {
-      // Guard: never overwrite admin profiles
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (currentProfile?.role === 'admin') {
-        console.log('Skipping role override for admin user:', userId);
-        return;
-      }
-
       const { data: employerProfile } = await supabase
         .from('profiles')
         .select('role')
@@ -488,6 +477,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         labLicense: userData.labLicense,
         specializations: userData.specializations?.join(','),
         operatingHours: userData.operatingHours,
+        latitude: (userData as any).latitude,
+        longitude: (userData as any).longitude,
       };
 
       // Use the actual site URL for the redirect
@@ -554,8 +545,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const nextBillingDate = new Date(complimentaryEndDate.getTime() + 30 * 24 * 60 * 60 * 1000); // Next billing after complimentary
 
       const newSubscription: UserSubscription = {
-        id: user.id, // Using user.id as the subscription ID since it's in the profiles table
-        userId: user.id,
+        id: user.id, // Using organization id
+        userId: user.authUserId || user.id,
         plan,
         status: 'trial',
         startDate: now.toISOString(),

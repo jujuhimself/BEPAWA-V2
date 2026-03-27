@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,10 @@ import {
   ShoppingCart,
   FileText,
   Shield,
-  Database
+  Database,
+  Loader2
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 // Import Business Operations Hub components
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -25,9 +27,71 @@ import FinancialManagement from "@/components/FinancialManagement";
 import CustomerRelationshipManagement from "@/components/CustomerRelationshipManagement";
 import NotificationManagement from "@/components/NotificationManagement";
 
+const formatCurrency = (amount: number) =>
+  `TZS ${amount.toLocaleString()}`;
+
 const WholesaleBusinessTools = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    revenueGrowth: 0,
+    activeOrders: 0,
+    retailerPartners: 0,
+    lowStockItems: 0,
+  });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const orgId = user.id;
+
+        // Revenue from POS sales
+        const { data: sales } = await supabase
+          .from('pos_sales')
+          .select('total_amount')
+          .eq('user_id', orgId);
+        const posRevenue = (sales || []).reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
+
+        // Revenue from completed orders where user is provider
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('total_amount, user_id, status')
+          .or(`pharmacy_id.eq.${orgId},wholesaler_id.eq.${orgId}`);
+        const orderRevenue = (orders || [])
+          .filter((o: any) => ['completed', 'paid', 'delivered', 'delivered_and_paid'].includes(o.status))
+          .reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+
+        const activeOrders = (orders || [])
+          .filter((o: any) => ['pending', 'processing', 'confirmed'].includes(o.status)).length;
+
+        const partnerIds = new Set((orders || []).map((o: any) => o.user_id).filter(Boolean));
+
+        // Low stock
+        const { count: lowStock } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', orgId)
+          .lte('stock', 10); // fallback threshold
+
+        setStats({
+          totalRevenue: posRevenue + orderRevenue,
+          revenueGrowth: 0,
+          activeOrders,
+          retailerPartners: partnerIds.size,
+          lowStockItems: lowStock || 0,
+        });
+      } catch (e) {
+        console.error('Stats fetch error', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, [user?.id]);
 
   const tools = [
     {
@@ -145,7 +209,7 @@ const WholesaleBusinessTools = () => {
               })}
             </div>
 
-            {/* Quick Stats */}
+            {/* Quick Stats - Live Data */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
               <Card>
                 <CardContent className="p-4">
@@ -153,8 +217,12 @@ const WholesaleBusinessTools = () => {
                     <TrendingUp className="h-4 w-4 text-green-500" />
                     <span className="text-sm font-medium">Total Revenue</span>
                   </div>
-                  <p className="text-2xl font-bold text-green-600">TZS 12.5M</p>
-                  <p className="text-xs text-gray-500">+15% from last month</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <>
+                      <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalRevenue)}</p>
+                      <p className="text-xs text-muted-foreground">{stats.revenueGrowth >= 0 ? '+' : ''}{stats.revenueGrowth.toFixed(1)}% from last month</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -164,7 +232,9 @@ const WholesaleBusinessTools = () => {
                     <ShoppingCart className="h-4 w-4 text-blue-500" />
                     <span className="text-sm font-medium">Active Orders</span>
                   </div>
-                  <p className="text-2xl font-bold text-blue-600">47</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <p className="text-2xl font-bold text-blue-600">{stats.activeOrders}</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -174,8 +244,9 @@ const WholesaleBusinessTools = () => {
                     <Users className="h-4 w-4 text-purple-500" />
                     <span className="text-sm font-medium">Retailer Partners</span>
                   </div>
-                  <p className="text-2xl font-bold text-purple-600">156</p>
-                  <p className="text-xs text-gray-500">+3 this week</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <p className="text-2xl font-bold text-purple-600">{stats.retailerPartners}</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -185,8 +256,12 @@ const WholesaleBusinessTools = () => {
                     <Package className="h-4 w-4 text-orange-500" />
                     <span className="text-sm font-medium">Low Stock Items</span>
                   </div>
-                  <p className="text-2xl font-bold text-orange-600">12</p>
-                  <p className="text-xs text-gray-500">Need reordering</p>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mt-2" /> : (
+                    <>
+                      <p className="text-2xl font-bold text-orange-600">{stats.lowStockItems}</p>
+                      <p className="text-xs text-muted-foreground">Need reordering</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -240,7 +240,7 @@ const Index = () => {
                   <Link to="/bepawa-care">Explore Bepawa Care</Link>
                 </Button>
                 <Button asChild variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
-                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
+                  <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
                 </Button>
               </div>
             </div>
@@ -270,103 +270,54 @@ const Index = () => {
       </section>
 
       {/* Breaking the Stigma Section */}
-      <section className="py-20 bg-gradient-to-b from-rose-50/60 via-white to-blue-50/40 border-t border-gray-100">
+      <section className="py-20 bg-gradient-to-br from-pink-50 via-white to-blue-50 border-t border-gray-100">
         <div className="container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <Badge className="mb-4 bg-rose-100 text-rose-600 border-rose-200 text-sm px-4 py-1">
-              Breaking the Stigma
-            </Badge>
-            <h3 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-5">
-              Your Health, Your Privacy — Without Stigma
-            </h3>
-            <p className="text-gray-600 text-base md:text-lg leading-relaxed">
-              At Bepawa, we believe everyone deserves access to healthcare — without judgment, without shame.
-            </p>
-            <p className="text-gray-600 text-base md:text-lg leading-relaxed mt-4">
-              Social stigma around HIV and sexual health keeps too many people from seeking care.
-              That's why we've created the Personal Health service: a safe, private way to order HIV self-test kits,
-              access PrEP & PEP, or book circumcision appointments, right from your phone.
-            </p>
-            <p className="text-gray-600 text-base md:text-lg leading-relaxed mt-4">
+          <div className="text-center mb-12">
+            <Badge variant="secondary" className="mb-4 bg-pink-100 text-pink-700 border-pink-200 text-lg">Breaking the Stigma</Badge>
+            <h3 className="text-4xl font-bold text-gray-900 mb-6">Your Health, Your Privacy — Without Stigma</h3>
+            <p className="text-xl text-gray-700 max-w-2xl mx-auto mb-10">
+              At Bepawa, we believe everyone deserves access to healthcare — without judgment, without shame.<br /><br />
+              Social stigma around HIV and sexual health keeps too many people from seeking care. That's why we've created the Personal Health service: a safe, private way to order HIV self-test kits or book circumcision appointments, right from your phone.<br /><br />
               Whether you're checking your status or making a personal health decision, we're here to walk with you — privately, confidently, and with dignity.
             </p>
           </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <Card className="shadow-lg border-0 bg-white hover:shadow-xl transition-all">
-              <CardHeader className="flex flex-row items-start gap-3 pb-2">
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* HIV Test Kits Card */}
+            <Card className="shadow-lg border-0 bg-white/90 hover:shadow-xl transition-all">
+              <CardHeader className="flex flex-row items-center gap-3 pb-2">
                 <span className="text-3xl">🧪</span>
                 <CardTitle className="text-lg font-semibold">Order HIV Test Kits Privately</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 mb-4">Delivered discreetly to your door. No one needs to know but you.</p>
-                <Button asChild className="w-full bg-rose-500 hover:bg-rose-600 text-white">
+                <Button asChild className="w-full bg-pink-600 hover:bg-pink-700 text-white">
                   <Link to="/dashboard/personal-health#hiv">Order Now</Link>
                 </Button>
               </CardContent>
             </Card>
-
-            <Card className="shadow-lg border-0 bg-white hover:shadow-xl transition-all">
-              <CardHeader className="flex flex-row items-start gap-3 pb-2">
-                <span className="text-3xl">💊</span>
-                <CardTitle className="text-lg font-semibold">PrEP — Daily Prevention</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">Pre-Exposure Prophylaxis prevents HIV before exposure. Book a consultation at a certified facility.</p>
-                <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  <Link to="/prep-pep">Access PrEP</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-0 bg-white hover:shadow-xl transition-all">
-              <CardHeader className="flex flex-row items-start gap-3 pb-2">
-                <span className="text-3xl">🚨</span>
-                <CardTitle className="text-lg font-semibold">PEP — Emergency Protection</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">Post-Exposure Prophylaxis must start within <strong>72 hours</strong>. Time-sensitive — act now.</p>
-                <Button asChild className="w-full bg-amber-600 hover:bg-amber-700 text-white">
-                  <Link to="/prep-pep">Get PEP Now</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-0 bg-white hover:shadow-xl transition-all">
-              <CardHeader className="flex flex-row items-start gap-3 pb-2">
+            {/* Circumcision Card */}
+            <Card className="shadow-lg border-0 bg-white/90 hover:shadow-xl transition-all">
+              <CardHeader className="flex flex-row items-center gap-3 pb-2">
                 <span className="text-3xl">✂️</span>
                 <CardTitle className="text-lg font-semibold">Book Circumcision Appointments</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 mb-4">Free and confidential for individuals aged 15+. Choose a trusted clinic near you.</p>
-                <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+                <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   <Link to="/dashboard/personal-health#circumcision">Book Now</Link>
                 </Button>
               </CardContent>
             </Card>
-
-            <Card className="shadow-lg border-0 bg-white hover:shadow-xl transition-all">
-              <CardHeader className="flex flex-row items-start gap-3 pb-2">
+            {/* Chatbot Card */}
+            <Card className="shadow-lg border-0 bg-white/90 hover:shadow-xl transition-all">
+              <CardHeader className="flex flex-row items-center gap-3 pb-2">
                 <span className="text-3xl">🤖</span>
                 <CardTitle className="text-lg font-semibold">Chat with Our Health Assistant</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 mb-4">Ask questions, get guidance, and talk things through — at your own pace.</p>
-                <Button asChild className="w-full bg-gray-800 hover:bg-gray-900 text-white">
-                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Start Chat</a>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg border-0 bg-white hover:shadow-xl transition-all">
-              <CardHeader className="flex flex-row items-start gap-3 pb-2">
-                <span className="text-3xl">💚</span>
-                <CardTitle className="text-lg font-semibold">Stigma & Emotional Support</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">Living with HIV? Get confidential counseling and community support.</p>
-                <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-                  <Link to="/bepawa-care">Talk to a Counselor</Link>
+                <Button asChild className="w-full bg-gray-700 hover:bg-gray-900 text-white">
+                  <Link to="/dashboard/personal-health#chatbot">Start Chat</Link>
                 </Button>
               </CardContent>
             </Card>
