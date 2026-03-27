@@ -64,6 +64,16 @@ function extractTopic(filePath: string): string {
   if (pathParts.includes('grief')) return 'grief';
   if (pathParts.includes('substance')) return 'substance';
   if (pathParts.includes('postpartum')) return 'postpartum';
+  // HIV knowledge topics
+  if (filePath.includes('hiv_basics') || filePath.includes('hiv/')) {
+    if (filePath.includes('pep')) return 'pep_guidance';
+    if (filePath.includes('prep')) return 'prep_guidance';
+    if (filePath.includes('self_test')) return 'hiv_self_testing';
+    if (filePath.includes('stigma')) return 'stigma_support';
+    if (filePath.includes('bepawaa') || filePath.includes('services')) return 'bepawaa_services';
+    if (filePath.includes('faq')) return 'hiv_faqs';
+    return 'hiv_basics';
+  }
   return 'general';
 }
 
@@ -309,12 +319,14 @@ async function main() {
     console.log('Clearing existing knowledge...');
     await supabase.from('care_knowledge').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     
-    // Process markdown files in knowledge directory
-    const knowledgePath = './knowledge';
-    try {
-      await processDirectory(knowledgePath);
-    } catch (error) {
-      console.log(`Knowledge directory not found or inaccessible: ${knowledgePath}`);
+    // Process markdown files in knowledge directories
+    const knowledgePaths = ['./knowledge/psychoeducation', './knowledge/hiv'];
+    for (const knowledgePath of knowledgePaths) {
+      try {
+        await processDirectory(knowledgePath);
+      } catch (error) {
+        console.log(`Knowledge directory not found or inaccessible: ${knowledgePath}`);
+      }
     }
     
     // Ingest additional content

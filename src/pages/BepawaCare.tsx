@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle2, Heart, MessageSquare, Shield, Sparkles, Users, Lock, Languages, Clock } from "lucide-react";
+import { CheckCircle2, Heart, MessageSquare, Shield, Sparkles, Users, Lock, Languages, Clock, AlertTriangle, Pill, TestTube } from "lucide-react";
 
 const BepawaCare = () => {
   return (
@@ -23,7 +23,7 @@ const BepawaCare = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-                <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">
+                <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">
                   Chat on WhatsApp
                 </a>
               </Button>
@@ -137,7 +137,7 @@ const BepawaCare = () => {
               <div className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" /> Specialized therapy: trauma recovery, HIV stigma & disclosure, family/relationship, addiction</div>
               <div className="pt-2">
                 <Button variant="outline" asChild className="w-full">
-                  <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">Talk to a counselor</a>
+                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Talk to a counselor</a>
                 </Button>
               </div>
             </CardContent>
@@ -145,17 +145,17 @@ const BepawaCare = () => {
         </div>
       </section>
 
-      {/* HIV Prevention Services */}
+      {/* HIV Prevention Services - Overview */}
       <section className="container mx-auto px-4 py-12">
         <div className="text-center max-w-2xl mx-auto mb-8">
-          <Badge variant="outline" className="mb-3 border-emerald-200 text-emerald-700">HIV Prevention</Badge>
-          <h3 className="text-3xl font-bold text-gray-900">Comprehensive HIV Prevention & Support</h3>
-          <p className="text-gray-600 mt-2">Bepawa provides confidential, stigma-free access to HIV prevention tools — from self-testing to PrEP and PEP services.</p>
+          <Badge variant="outline" className="mb-3 border-emerald-200 text-emerald-700">Break the Stigma</Badge>
+          <h3 className="text-3xl font-bold text-gray-900">HIV Prevention, Testing & Support</h3>
+          <p className="text-gray-600 mt-2">Bepawa provides confidential, stigma-free access to HIV prevention tools — from self-testing to PrEP and PEP services. No judgment, just support.</p>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="border-0 shadow-md bg-white text-center">
             <CardContent className="p-6 space-y-3">
-              <Shield className="h-10 w-10 text-emerald-600 mx-auto" />
+              <TestTube className="h-10 w-10 text-emerald-600 mx-auto" />
               <h4 className="font-bold text-lg">HIV Self-Testing</h4>
               <p className="text-sm text-gray-600">Order confidential HIV self-test kits delivered to your door. Private, accurate, and easy to use.</p>
             </CardContent>
@@ -164,28 +164,219 @@ const BepawaCare = () => {
             <CardContent className="p-6 space-y-3">
               <Shield className="h-10 w-10 text-blue-600 mx-auto" />
               <h4 className="font-bold text-lg">PrEP Access</h4>
-              <p className="text-sm text-gray-600">Pre-Exposure Prophylaxis — daily prevention medicine. Book through nearby health facilities.</p>
+              <p className="text-sm text-gray-600">Pre-Exposure Prophylaxis — daily prevention medicine for people at ongoing risk of HIV.</p>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-md bg-white text-center">
             <CardContent className="p-6 space-y-3">
-              <Shield className="h-10 w-10 text-purple-600 mx-auto" />
+              <AlertTriangle className="h-10 w-10 text-orange-600 mx-auto" />
               <h4 className="font-bold text-lg">PEP Access</h4>
-              <p className="text-sm text-gray-600">Post-Exposure Prophylaxis — emergency medicine within 72 hours. Time-sensitive, available now.</p>
+              <p className="text-sm text-gray-600">Post-Exposure Prophylaxis — emergency medicine within 72 hours of possible exposure.</p>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-md bg-white text-center">
             <CardContent className="p-6 space-y-3">
               <Heart className="h-10 w-10 text-green-600 mx-auto" />
-              <h4 className="font-bold text-lg">AI-Guided Consultations</h4>
-              <p className="text-sm text-gray-600">Our AI assistant provides confidential risk assessment, education, and next-step guidance in your language.</p>
+              <h4 className="font-bold text-lg">Stigma-Free Support</h4>
+              <p className="text-sm text-gray-600">Our AI companion offers private, judgment-free guidance in English or Swahili — anytime you need it.</p>
             </CardContent>
           </Card>
         </div>
-        <div className="text-center mt-6">
-          <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
-            <Link to="/prep-pep">Browse PrEP & PEP Services</Link>
-          </Button>
+      </section>
+
+      {/* Detailed PrEP Section */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="grid lg:grid-cols-2 gap-10 items-start">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-blue-100 p-3 rounded-xl">
+                <Pill className="h-7 w-7 text-blue-700" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">What is PrEP?</h3>
+                <p className="text-sm text-blue-700 font-medium">Pre-Exposure Prophylaxis</p>
+              </div>
+            </div>
+            <p className="text-gray-700 mb-4">
+              PrEP is a daily pill taken by HIV-negative people who are at ongoing risk of getting HIV. When taken consistently, PrEP reduces the risk of getting HIV from sex by about <strong>99%</strong>.
+            </p>
+            <div className="space-y-3 mb-6">
+              <h4 className="font-semibold text-gray-900">Who should consider PrEP?</h4>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" /> People with an HIV-positive partner</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" /> People who don't consistently use condoms</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" /> People who have had a recent STI</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" /> People who inject drugs and share needles</li>
+              </ul>
+            </div>
+            <div className="space-y-3 mb-6">
+              <h4 className="font-semibold text-gray-900">How to get started</h4>
+              <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+                <li>Get tested for HIV (must be negative to start PrEP)</li>
+                <li>Consult with a healthcare provider through Bepawa</li>
+                <li>Get your prescription and regular follow-up testing</li>
+                <li>Take your pill daily for maximum protection</li>
+              </ol>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                <Link to="/prep-pep">Find PrEP Providers</Link>
+              </Button>
+              <Button variant="outline" asChild className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                <a href="https://wa.me/255744969325?text=I%20want%20to%20learn%20about%20PrEP" target="_blank" rel="noreferrer">Ask About PrEP</a>
+              </Button>
+            </div>
+          </div>
+
+          {/* Detailed PEP Section */}
+          <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-8 border border-orange-100">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-orange-100 p-3 rounded-xl">
+                <AlertTriangle className="h-7 w-7 text-orange-700" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">What is PEP?</h3>
+                <p className="text-sm text-orange-700 font-medium">Post-Exposure Prophylaxis — Time-Sensitive</p>
+              </div>
+            </div>
+            <div className="bg-orange-100/60 border border-orange-200 rounded-lg p-4 mb-4">
+              <p className="text-orange-800 font-semibold text-sm flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                PEP must be started within 72 hours of possible exposure. The sooner you start, the more effective it is.
+              </p>
+            </div>
+            <p className="text-gray-700 mb-4">
+              PEP is a 28-day course of antiretroviral medicine taken after a possible exposure to HIV. It can prevent HIV infection if started quickly.
+            </p>
+            <div className="space-y-3 mb-6">
+              <h4 className="font-semibold text-gray-900">When to consider PEP</h4>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" /> Unprotected sex with someone who may have HIV</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" /> Condom broke or slipped during sex</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" /> Sexual assault</li>
+                <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" /> Shared needles or accidental needle stick</li>
+              </ul>
+            </div>
+            <div className="space-y-3 mb-6">
+              <h4 className="font-semibold text-gray-900">What to expect</h4>
+              <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+                <li>Contact a provider immediately — don't wait</li>
+                <li>Get tested for HIV before starting PEP</li>
+                <li>Take the full 28-day course without missing doses</li>
+                <li>Follow up with HIV testing at 4-6 weeks and 3 months</li>
+              </ol>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button asChild className="bg-orange-600 hover:bg-orange-700">
+                <Link to="/prep-pep">Find PEP Now — Urgent</Link>
+              </Button>
+              <Button variant="outline" asChild className="border-orange-200 text-orange-700 hover:bg-orange-50">
+                <a href="https://wa.me/255744969325?text=I%20need%20urgent%20PEP%20access" target="_blank" rel="noreferrer">WhatsApp for PEP</a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HIV Self-Testing Deep Dive */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="max-w-4xl mx-auto bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-8 border border-emerald-100">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-emerald-100 p-3 rounded-xl">
+              <TestTube className="h-7 w-7 text-emerald-700" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">HIV Self-Testing</h3>
+              <p className="text-sm text-emerald-700 font-medium">Private, easy, and empowering</p>
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <p className="text-gray-700 mb-4">
+                HIV self-testing lets you check your status privately at home. It's a first step — not a final diagnosis — that connects you to the right care and support.
+              </p>
+              <div className="space-y-3 mb-4">
+                <h4 className="font-semibold text-gray-900">How it works</h4>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" /> Order a kit — delivered in discreet packaging</li>
+                  <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" /> Simple oral swab or finger prick — results in 15-20 mins</li>
+                  <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" /> Clear instructions included in the kit</li>
+                  <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" /> Chat support available if you need help reading results</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div className="space-y-3 mb-4">
+                <h4 className="font-semibold text-gray-900">After your test</h4>
+                <div className="bg-white rounded-lg p-4 space-y-3 border border-emerald-100">
+                  <div>
+                    <p className="font-medium text-gray-900">Negative result ✅</p>
+                    <p className="text-sm text-gray-600">Stay protected — consider PrEP if at ongoing risk. Retest every 3 months.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Positive result</p>
+                    <p className="text-sm text-gray-600">This is a screening result. Visit a facility for a confirmatory test. Early treatment leads to a healthy life. You are not alone.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Invalid result ⚠️</p>
+                    <p className="text-sm text-gray-600">The test didn't work properly. Try again with a new kit or visit a facility.</p>
+                  </div>
+                </div>
+              </div>
+              <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <Link to="/personal-health">Order HIV Self-Test Kit</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Stigma & Emotional Support */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="max-w-4xl mx-auto bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border border-purple-100">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bg-purple-100 p-3 rounded-xl">
+              <Heart className="h-7 w-7 text-purple-700" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900">You're Not Alone</h3>
+              <p className="text-sm text-purple-700 font-medium">Stigma-free emotional support for HIV-related concerns</p>
+            </div>
+          </div>
+          <p className="text-gray-700 mb-6">
+            Fear, shame, and confusion around HIV are common — and completely understandable. Whether you're worried about exposure, navigating a diagnosis, or supporting someone you love, Bepawa Care provides a safe, private space to talk, learn, and find your next step.
+          </p>
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <Card className="bg-white/80 border-purple-100">
+              <CardContent className="p-5 text-center">
+                <MessageSquare className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                <h4 className="font-semibold text-sm mb-1">Confidential Chat</h4>
+                <p className="text-xs text-gray-600">Talk to our AI companion 24/7 — no judgment, no records shared</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/80 border-purple-100">
+              <CardContent className="p-5 text-center">
+                <Users className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                <h4 className="font-semibold text-sm mb-1">Counselor Access</h4>
+                <p className="text-xs text-gray-600">Book a session with a licensed counselor who understands HIV-related stigma</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/80 border-purple-100">
+              <CardContent className="p-5 text-center">
+                <Shield className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                <h4 className="font-semibold text-sm mb-1">Safe Disclosure</h4>
+                <p className="text-xs text-gray-600">Learn about disclosure at your own pace — when, how, and to whom</p>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button asChild className="bg-purple-600 hover:bg-purple-700">
+              <a href="https://wa.me/255744969325?text=I%20need%20someone%20to%20talk%20to%20about%20HIV" target="_blank" rel="noreferrer">Talk to Someone Now</a>
+            </Button>
+            <Button asChild variant="outline" className="border-purple-200 text-purple-700 hover:bg-purple-50">
+              <Link to="/appointments">Book a Counselor</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -212,7 +403,7 @@ const BepawaCare = () => {
                   <Link to="/appointments">Book Session</Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">WhatsApp</a>
+                  <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">WhatsApp</a>
                 </Button>
               </div>
             </div>
@@ -302,7 +493,7 @@ const BepawaCare = () => {
           <h4 className="text-2xl font-bold text-gray-900 mb-3">Start your journey today – your mental health is your right.</h4>
           <div className="flex flex-col sm:flex-row justify-center gap-3">
             <Button asChild size="lg" className="bg-green-600 hover:bg-green-700">
-              <a href="https://wa.me/255797344625" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
+              <a href="https://wa.me/255744969325" target="_blank" rel="noreferrer">Chat on WhatsApp</a>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
               <Link to="/appointments">Book a Counselor</Link>
@@ -352,7 +543,7 @@ const BepawaCare = () => {
             <div>
               <h4 className="font-semibold mb-4 text-lg">Support</h4>
               <ul className="space-y-3 text-gray-400">
-                <li><a href="https://wa.me/255797344625" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Healthcare Support (WhatsApp)</a></li>
+                <li><a href="https://wa.me/255744969325" target="_blank" rel="noreferrer" className="hover:text-white transition-colors">Healthcare Support (WhatsApp)</a></li>
                 <li><Link to="/settings" className="hover:text-white transition-colors">Technical Help</Link></li>
                 <li><a href="#" className="hover:text-white transition-colors">Training Resources</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">API Documentation</a></li>

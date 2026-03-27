@@ -281,8 +281,8 @@ ${faqs.map(f => `• ${f.q}\n  ${f.a}`).join('\n')}`)
     id: Date.now().toString(),
     type: 'bot',
     content: lang === 'sw'
-      ? 'Nashauri uunganishwe na mshauri wa kitaalamu kwa msaada zaidi. Unaweza kuzungumza kupitia WhatsApp au kuweka miadi ya siri (chat/video).\n\n• WhatsApp: https://wa.me/255797344625\n• Book session: /appointments'
-      : 'I recommend connecting with a licensed counselor for more support. You can use WhatsApp or book a confidential session (chat/video).\n\n• WhatsApp: https://wa.me/255797344625\n• Book session: /appointments',
+      ? 'Nashauri uunganishwe na mshauri wa kitaalamu kwa msaada zaidi. Unaweza kuzungumza kupitia WhatsApp au kuweka miadi ya siri (chat/video).\n\n• WhatsApp: https://wa.me/255744969325\n• Book session: /appointments'
+      : 'I recommend connecting with a licensed counselor for more support. You can use WhatsApp or book a confidential session (chat/video).\n\n• WhatsApp: https://wa.me/255744969325\n• Book session: /appointments',
     timestamp: new Date(),
     suggestions: ['Start 2-minute timer', 'Grounding exercise'],
     category: 'general'
@@ -296,11 +296,11 @@ ${faqs.map(f => `• ${f.q}\n  ${f.a}`).join('\n')}`)
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const getRoleSpecificGreeting = () => {
-        if (!user) return "Hello! 💚 I'm Bepawa Care, your mental health companion. I'm here to listen and support you. How are you feeling today?";
+        if (!user) return "Hello! 💚 I'm Bepawaa Care — your private health companion. I support HIV testing, PrEP, PEP, emotional wellbeing, and more. Everything here is confidential. How can I help you?";
         
         switch (user.role) {
           case 'individual':
-            return `Hello ${user.name}! 💚 I'm Bepawa Care. I'm here to support your mental health and wellbeing. How are you feeling today?`;
+            return `Hello ${user.name}! 💚 I'm Bepawaa Care — your private health companion for HIV support, mental wellbeing, and more. I'm here to listen without judgment. How can I help you today?`;
           case 'retail':
             return `Welcome back, ${user.pharmacyName}! 🏪 I'm your business assistant. I can provide inventory insights, restock suggestions, standard treatment guidelines, order summaries, and even generate quick invoices. How can I assist your pharmacy today?`;
           case 'wholesale':
@@ -316,23 +316,23 @@ ${faqs.map(f => `• ${f.q}\n  ${f.a}`).join('\n')}`)
 
       const getRoleSpecificSuggestions = () => {
         if (!user) return [
-          'I feel stressed 😔',
-          'I need someone to talk to 💬',
-          'I feel anxious 😰',
-          'I have alcohol addiction 🍺',
-          'Coping strategies 💪',
-          'Book a counselor 🤝'
+          'I want to test for HIV privately 🔒',
+          'I had a possible HIV exposure ⚡',
+          'Tell me about PrEP 💊',
+          'I feel scared or confused 😔',
+          'What HIV services do you offer?',
+          'I need emotional support 💚'
         ];
         
         switch (user.role) {
           case 'individual':
             return [
-              'I feel stressed 😔',
-              'I need someone to talk to 💬',
-              'I feel anxious 😰',
-              'Coping strategies 💪',
-              'Breathing exercise 🧘',
-              'Book a counselor 🤝'
+              'I want to test for HIV privately 🔒',
+              'I had a possible HIV exposure ⚡',
+              'Tell me about PrEP 💊',
+              'I feel scared or confused 😔',
+              'What HIV services do you offer?',
+              'I need emotional support 💚'
             ];
           case 'retail':
             return ['What’s the first-line treatment for malaria in adults?', 'What’s the dosage for paracetamol in children?', 'Show me inventory insights', 'Generate sales report', 'Treatment guidelines', 'Cardiac arrest protocol'];
@@ -1046,29 +1046,44 @@ const getTreatmentGuidelineResponse = (query: string): Message | null => {
           {/* Quick Actions - Individual (Bepawa Care Lite) */}
           {user?.role === 'individual' && (
             <div className="px-4 pt-4 pb-2 border-b bg-white/60 backdrop-blur space-y-2">
-              <div className="flex flex-wrap gap-2">
-                {['Stress self-check', 'Anxiety scale', 'HIV stigma support', 'Breathing exercise'].map((q) => (
-                  <Badge
-                    key={q}
-                    variant="outline"
-                    className="text-xs cursor-pointer hover:bg-green-50 hover:border-green-300"
-                    onClick={() => handleSendMessage(q)}
-                  >
-                    {q}
-                  </Badge>
-                ))}
+              <div>
+                <p className="text-[11px] text-muted-foreground mb-1 font-medium">🛡️ HIV Support</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'I want to test privately 🔒',
+                    'Possible exposure (PEP) ⚡',
+                    'Tell me about PrEP 💊',
+                    'Order HIV test kit 📦',
+                    'My test results 📋'
+                  ].map((q) => (
+                    <Badge
+                      key={q}
+                      variant="outline"
+                      className="text-xs cursor-pointer hover:bg-accent hover:border-primary transition-colors"
+                      onClick={() => handleSendMessage(q)}
+                    >
+                      {q}
+                    </Badge>
+                  ))}
+                </div>
               </div>
               <div>
-                <p className="text-[11px] text-gray-500 mb-1">Explore topics</p>
-                <div className="flex flex-wrap gap-2">
-                  {['Stress','Anxiety','Depression','Relationships','Sleep','Trauma','Grief','Financial stress','Substance','Postpartum','HIV stigma'].map((t) => (
+                <p className="text-[11px] text-muted-foreground mb-1 font-medium">💚 Wellbeing</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'I feel scared or ashamed 😔',
+                    'Stigma support ❤️',
+                    'Breathing exercise 🧘',
+                    'Talk to a counselor 🤝',
+                    'Coping strategies 💪'
+                  ].map((q) => (
                     <Badge
-                      key={t}
+                      key={q}
                       variant="outline"
-                      className="text-xs cursor-pointer hover:bg-blue-50 hover:border-blue-300"
-                      onClick={() => handleSendMessage(t)}
+                      className="text-xs cursor-pointer hover:bg-accent hover:border-primary transition-colors"
+                      onClick={() => handleSendMessage(q)}
                     >
-                      {t}
+                      {q}
                     </Badge>
                   ))}
                 </div>
