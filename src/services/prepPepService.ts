@@ -39,6 +39,14 @@ export interface PrepPepBooking {
 }
 
 class PrepPepServiceAPI {
+  private inferLegacyServiceType(product: { name?: string | null; description?: string | null }): PrepPepService['service_type'] {
+    const haystack = `${product.name || ''} ${product.description || ''}`.toLowerCase();
+    if (haystack.includes('pep') || haystack.includes('post-exposure') || haystack.includes('post exposure')) {
+      return 'pep';
+    }
+    return 'prep';
+  }
+
   // ===== LAB MANAGEMENT =====
   async getMyServices(): Promise<PrepPepService[]> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -77,7 +85,6 @@ class PrepPepServiceAPI {
 
   // ===== BROWSING (INDIVIDUAL) =====
   async getAvailableServices(): Promise<(PrepPepService & { lab: any })[]> {
-    // Return services from both labs and pharmacies via the prep_pep_services table
     const { data, error } = await supabase
       .from('prep_pep_services')
       .select('*, lab:profiles!prep_pep_services_lab_id_fkey(id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude, role)')
@@ -85,8 +92,67 @@ class PrepPepServiceAPI {
       .eq('stock_status', 'available');
 
     if (error) throw error;
-    
-    return (data || []) as any[];
+
+    const services = (data || []) as any[];
+    const existingKeys = new Set(services.map((service: any) => `${service.lab_id}:${service.service_type}`));
+
+    // Keep support for legacy pharmacy tagging so older PrEP/PEP product setups still appear.
+    const { data: prepPepProducts, error: productsError } = await supabase
+      .from('products')
+      .select('id, user_id, name, description, sell_price, stock')
+      .eq('is_prep_pep', true)
+      .gt('stock', 0);
+
+    if (productsError || !prepPepProducts?.length) {
+      return services;
+    }
+
+    const pharmacyIds = [...new Set(prepPepProducts.map(product => product.user_id).filter(Boolean))];
+    if (pharmacyIds.length === 0) {
+      return services;
+    }
+
+    const { data: pharmacyProfiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name, pharmacy_name, business_name, phone, address, region, city, latitude, longitude, role')
+      .in('id', pharmacyIds)
+      .eq('role', 'retail');
+
+    if (profilesError || !pharmacyProfiles?.length) {
+      return services;
+    }
+
+    const legacyServices = new Map<string, any>();
+
+    for (const product of prepPepProducts) {
+      const pharmacy = pharmacyProfiles.find(profile => profile.id === product.user_id);
+      if (!pharmacy) continue;
+
+      const serviceType = this.inferLegacyServiceType(product);
+      const key = `${product.user_id}:${serviceType}`;
+      if (existingKeys.has(key)) continue;
+
+      const current = legacyServices.get(key);
+      const candidate = {
+        id: `legacy-product-${product.id}`,
+        lab_id: product.user_id,
+        service_type: serviceType,
+        is_available: true,
+        consultation_required: false,
+        stock_status: 'available',
+        price: product.sell_price || 0,
+        description: product.description || product.name,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        lab: pharmacy,
+      };
+
+      if (!current || candidate.price < current.price) {
+        legacyServices.set(key, candidate);
+      }
+    }
+
+    return [...services, ...legacyServices.values()] as any[];
   }
 
   // ===== BOOKINGS =====
