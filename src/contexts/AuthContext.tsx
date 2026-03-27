@@ -73,6 +73,10 @@ export const useAuth = () => {
   return context;
 };
 
+export const useOptionalAuth = () => {
+  return useContext(AuthContext);
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -148,6 +152,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check and link staff invitation on registration/login, returns StaffInfo
   const checkAndLinkStaffInvitation = async (userId: string, email: string): Promise<StaffInfo | null> => {
     try {
+      const { data: profileCheck, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileCheckError) {
+        console.error('Error checking profile role before staff linking:', profileCheckError);
+      }
+
+      if (profileCheck?.role === 'admin') {
+        console.log('Admin account detected, skipping staff linking for:', userId);
+        return null;
+      }
+
       // Get active staff links for this auth user (handle duplicates safely)
       const { data: linkedStaffRows, error: linkedError } = await supabase
         .from('staff_members')
@@ -236,6 +255,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Ensure staff user's profile role matches their employer's role
   const ensureStaffProfileRole = async (userId: string, employerId: string) => {
     try {
+      const { data: currentProfile, error: currentProfileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (currentProfileError) {
+        console.error('Error checking current profile role:', currentProfileError);
+        return;
+      }
+
+      if (currentProfile?.role === 'admin') {
+        console.log('Skipping role override for admin user:', userId);
+        return;
+      }
+
       const { data: employerProfile } = await supabase
         .from('profiles')
         .select('role')
